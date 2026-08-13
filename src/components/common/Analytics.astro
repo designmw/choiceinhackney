@@ -1,0 +1,46 @@
+---
+import { ANALYTICS } from 'astrowind:config';
+
+// Google Analytics 4 with Consent Mode v2. Analytics/ads storage default to
+// DENIED — GA loads but sets no cookies and sends only cookieless pings until
+// the visitor accepts via the cookie banner (see CookieConsent.astro), which
+// calls gtag('consent', 'update', ...). A returning visitor who previously
+// accepted is granted immediately from their stored choice.
+//
+// The JS is injected via set:html (rather than written as raw <script>
+// children) so its braces aren't parsed as JSX expressions when nested in the
+// conditional below — see the note in CookieConsent.astro.
+const id = ANALYTICS?.vendors?.googleAnalytics?.id ? String(ANALYTICS.vendors.googleAnalytics.id) : '';
+
+// 1. Consent defaults + gtag stub — must run before the GA library loads.
+const consentDefaultScript = `
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  window.gtag = gtag;
+  var awConsent = 'denied';
+  try { if (localStorage.getItem('aw-cookie-consent') === 'granted') awConsent = 'granted'; } catch (e) {}
+  gtag('consent', 'default', {
+    ad_storage: awConsent,
+    ad_user_data: awConsent,
+    ad_personalization: awConsent,
+    analytics_storage: awConsent,
+    functionality_storage: 'granted',
+    security_storage: 'granted',
+    wait_for_update: 500
+  });
+  gtag('js', new Date());
+`;
+
+// 3. Configure the property (id is a GA4 Measurement ID like "G-XXXXXXXXXX").
+const configScript = `gtag('config', ${JSON.stringify(id)}, { anonymize_ip: true });`;
+---
+
+{
+  id && (
+    <Fragment>
+      <script is:inline set:html={consentDefaultScript} />
+      <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${id}`} />
+      <script is:inline set:html={configScript} />
+    </Fragment>
+  )
+}

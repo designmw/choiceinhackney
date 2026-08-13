@@ -1,0 +1,65 @@
+---
+import { business } from '~/config/business';
+
+export interface Props {
+  name?: string;
+  /** schema.org @type, e.g. Plumber, Attorney, HairSalon */
+  type?: string;
+  url?: string;
+  telephone?: string;
+  street?: string;
+  locality?: string;
+  /** e.g. "Co. Kerry" */
+  region?: string;
+  postalCode?: string;
+  /** ISO 3166-1 alpha-2, e.g. IE */
+  country?: string;
+  /** Absolute URL to a representative image */
+  image?: string;
+}
+
+const {
+  name = business.name,
+  type = business.type,
+  url = business.url,
+  telephone = business.telephone,
+  street = business.address.street,
+  locality = business.address.locality,
+  region = business.address.region,
+  postalCode = business.address.postalCode,
+  country = business.address.country,
+  image = business.image,
+} = Astro.props;
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': type,
+  name,
+  url,
+  telephone,
+  image,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: street,
+    addressLocality: locality,
+    addressRegion: region,
+    postalCode,
+    addressCountry: country,
+  },
+  ...(business.description ? { description: business.description } : {}),
+  ...(business.openingHours?.length ? { openingHours: business.openingHours } : {}),
+  ...(business.priceRange ? { priceRange: business.priceRange } : {}),
+  ...(business.sameAs?.length ? { sameAs: business.sameAs } : {}),
+  ...(business.aggregateRating
+    ? {
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: business.aggregateRating.ratingValue,
+          reviewCount: business.aggregateRating.reviewCount,
+        },
+      }
+    : {}),
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

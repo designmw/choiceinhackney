@@ -1,0 +1,26 @@
+---
+import { getCollection } from 'astro:content';
+import FAQs from '~/components/widgets/FAQs.astro';
+import FaqSchema from '~/components/schema/FaqSchema.astro';
+import type { Faqs as Props } from '~/types';
+
+// Drop-in FAQs that loads from the `faq` content collection (src/data/faq/) and
+// automatically emits FAQPage JSON-LD. Takes the same props as <FAQs> except
+// `items`, which it fills itself.
+const props = Astro.props as Props;
+
+const entries = (await getCollection('faq', ({ data }) => !data.draft)).sort(
+  (a, b) => (a.data.order ?? 999) - (b.data.order ?? 999)
+);
+
+const items = entries.map((entry) => ({
+  title: entry.data.question,
+  description: entry.data.answer,
+  icon: entry.data.icon,
+}));
+
+const schemaItems = entries.map((entry) => ({ question: entry.data.question, answer: entry.data.answer }));
+---
+
+{schemaItems.length > 0 && <FaqSchema items={schemaItems} />}
+{items.length > 0 && <FAQs {...props} items={items} />}

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "title": "Example editor page",
+  "draft": false,
+  "metadata": {
+    "title": "Example editor page",
+    "description": "A hand-written contract page proving every block type renders through the base widget library. Remove this file on real client sites before going live."
+  },
+  "blocks": [
+    {
+      "type": "hero",
+      "id": "hero-1",
+      "tagline": "Contract v1",
+      "title": "Every block, rendered from one JSON file",
+      "subtitle": "This page is written by hand against the content contract. If it builds, the renderer works before the editor is ever involved.",
+      "actions": [
+        { "variant": "primary", "text": "Get a quote", "href": "/contact" },
+        { "variant": "secondary", "text": "Our services", "href": "/services" }
+      ]
+    },
+    {
+      "type": "features",
+      "id": "features-1",
+      "tagline": "What we do",
+      "title": "Services built around you",
+      "subtitle": "Three example items with icons.",
+      "columns": 3,
+      "items": [
+        { "title": "Service one", "description": "A short description of the first service.", "icon": "tabler:tool" },
+        { "title": "Service two", "description": "A short description of the second service.", "icon": "tabler:home" },
+        { "title": "Service three", "description": "A short description of the third service.", "icon": "tabler:clock" }
+      ]
+    },
+    {
+      "type": "steps",
+      "id": "steps-1",
+      "title": "How it works",
+      "items": [
+        { "title": "Get in touch", "description": "Call or send the form.", "icon": "tabler:phone" },
+        { "title": "Free quote", "description": "We visit and price the job.", "icon": "tabler:file-text" },
+        { "title": "Job done", "description": "Work completed and tidied up.", "icon": "tabler:check" }
+      ]
+    },
+    {
+      "type": "content",
+      "id": "content-1",
+      "tagline": "About us",
+      "title": "A content section with rich text",
+      "content": "<p>This paragraph arrives as <strong>sanitised HTML</strong> from the contract file, exactly as the editor's rich text field will produce it.</p>",
+      "items": [
+        { "title": "Fully insured", "description": "Cover on every job." },
+        { "title": "Local team", "description": "Based in the community we serve." }
+      ],
+      "isReversed": false
+    },
+    {
+      "type": "stats",
+      "id": "stats-1",
+      "items": [
+        { "amount": "15+", "title": "Years in business" },
+        { "amount": "800", "title": "Jobs completed" },
+        { "amount": "5.0", "title": "Average rating" }
+      ]
+    },
+    {
+      "type": "testimonials",
+      "id": "testimonials-1",
+      "tagline": "Testimonials",
+      "title": "What our customers say",
+      "items": [
+        {
+          "testimonial": "Brilliant service from start to finish.",
+          "name": "Mary B.",
+          "job": "Homeowner, Killarney",
+          "rating": 5
+        },
+        { "testimonial": "Fast, tidy and fairly priced.", "name": "John D.", "job": "Landlord, Tralee", "rating": 5 }
+      ]
+    },
+    {
+      "type": "pricing",
+      "id": "pricing-1",
+      "title": "Simple pricing",
+      "prices": [
+        {
+          "title": "Standard",
+          "price": 99,
+          "period": "per visit",
+          "items": [{ "description": "Callout included" }, { "description": "Parts at cost" }],
+          "callToAction": { "variant": "primary", "text": "Book now", "href": "/contact" }
+        },
+        {
+          "title": "Premium",
+          "price": 149,
+          "period": "per visit",
+          "hasRibbon": true,
+          "ribbonTitle": "Popular",
+          "items": [{ "description": "Priority callout" }, { "description": "12 month guarantee" }],
+          "callToAction": { "variant": "primary", "text": "Book now", "href": "/contact" }
+        }
+      ]
+    },
+    {
+      "type": "brands",
+      "id": "brands-1",
+      "title": "Brands we work with",
+      "images": [
+        { "src": "https://cdn.pixabay.com/photo/2015/04/23/17/41/javascript-736400_1280.png", "alt": "Example brand" }
+      ]
+    },
+    {
+      "type": "faqs",
+      "id": "faqs-1",
+      "tagline": "FAQs",
+      "title": "Frequently asked questions",
+      "columns": 2,
+      "items": [
+        { "title": "What areas do you cover?", "description": "All of the county and surrounding areas." },
+        { "title": "Are you insured?", "description": "Yes, fully insured for every job we take on." }
+      ]
+    },
+    {
+      "type": "cta",
+      "id": "cta-1",
+      "title": "Ready to get started?",
+      "subtitle": "Send a message and we will come back to you today.",
+      "actions": [{ "variant": "primary", "text": "Contact us", "href": "/contact" }]
+    },
+    {
+      "type": "contact",
+      "id": "contact-1",
+      "tagline": "Contact",
+      "title": "Drop us a message",
+      "description": "Tell us what you are looking for and we will get back to you as soon as we can."
+    }
+  ]
+}

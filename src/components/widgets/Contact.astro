@@ -1,0 +1,93 @@
+---
+import FormContainer from '~/components/ui/Form.astro';
+import WidgetWrapper from '~/components/ui/WidgetWrapper.astro';
+import OpeningHours from '~/components/common/OpeningHours.astro';
+import { Icon } from 'astro-icon/components';
+import { business } from '~/config/business';
+import type { Contact as Props } from '~/types';
+
+// Standard contact layout: contact details (with icons) on the LEFT, the form
+// on the RIGHT. Details are sourced from src/config/business.ts so they stay in
+// sync per client. `title`/`description` label the form card.
+const {
+  title = await Astro.slots.render('title'),
+  inputs,
+  textarea,
+  disclaimer,
+  button,
+  description,
+
+  id,
+  isDark = false,
+  classes = {},
+  bg = await Astro.slots.render('bg'),
+} = Astro.props;
+
+const tel = business.telephone;
+const details = [
+  { icon: 'tabler:phone', label: 'Phone', value: tel, href: `tel:${tel.replace(/\s/g, '')}` },
+  ...(business.email
+    ? [{ icon: 'tabler:mail', label: 'Email', value: business.email, href: `mailto:${business.email}` }]
+    : []),
+  {
+    icon: 'tabler:map-pin',
+    label: 'Address',
+    value: `${business.address.locality}, ${business.address.region}`,
+    href: undefined,
+  },
+];
+
+const formHeading = title || 'Send us a message';
+---
+
+<WidgetWrapper id={id} isDark={isDark} containerClass={`max-w-6xl mx-auto ${classes?.container ?? ''}`} bg={bg}>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+    {/* Left — contact details */}
+    <div class="lg:pr-8">
+      <h2 class="text-3xl md:text-4xl font-bold font-heading text-heading">Contact details</h2>
+      <p class="mt-4 text-muted">Prefer to talk directly? Reach us any of these ways and we'll be happy to help.</p>
+
+      <div class="mt-8 flex flex-col gap-6">
+        {
+          details.map(({ icon, label, value, href }) => {
+            const body = (
+              <>
+                <span class="shrink-0 w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+                  <Icon name={icon} class="w-5 h-5 text-primary" aria-hidden="true" />
+                </span>
+                <span class="flex flex-col">
+                  <span class="font-semibold text-heading">{label}</span>
+                  <span class="text-muted">{value}</span>
+                </span>
+              </>
+            );
+            return href ? (
+              <a href={href} class="flex items-center gap-4 hover:text-primary transition duration-150 ease-in-out">
+                {body}
+              </a>
+            ) : (
+              <div class="flex items-center gap-4">{body}</div>
+            );
+          })
+        }
+      </div>
+
+      <div class="mt-8">
+        <OpeningHours />
+      </div>
+    </div>
+
+    {/* Right — form card */}
+    {
+      inputs && (
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 shadow p-6 sm:p-8">
+          <h3 class="text-2xl font-bold font-heading text-heading" set:html={formHeading} />
+          {description && <p class="mt-2 text-muted" set:html={description} />}
+          <div class="mt-6">
+            <FormContainer inputs={inputs} textarea={textarea} disclaimer={disclaimer} button={button} />
+          </div>
+        </div>
+      )
+    }
+  </div>
+</WidgetWrapper>

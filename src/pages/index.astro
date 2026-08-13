@@ -1,0 +1,43 @@
+---
+import { getEntry } from 'astro:content';
+import Layout from '~/layouts/PageLayout.astro';
+import LocalBusinessSchema from '~/components/schema/LocalBusinessSchema.astro';
+import BlockRenderer from '~/components/blocks/BlockRenderer.astro';
+
+// When the editor manages the homepage it writes src/data/pages/home.json
+// and this route renders it. Without that file (or while it is a draft)
+// the placeholder below renders instead. Astro's route priority means the
+// [...page].astro catch-all can never serve "/", so the homepage has to be
+// handled here.
+const home = await getEntry('page', 'home');
+const useContract = home && !home.data.draft;
+
+const metadata = useContract
+  ? {
+      title: home.data.metadata.title ?? home.data.title,
+      description: home.data.metadata.description,
+      ignoreTitleTemplate: true,
+      robots: home.data.metadata.robots,
+    }
+  : {
+      title: 'Home',
+      ignoreTitleTemplate: true,
+    };
+---
+
+<Layout metadata={metadata}>
+  <Fragment slot="head">
+    <LocalBusinessSchema />
+  </Fragment>
+
+  {
+    useContract ? (
+      <BlockRenderer blocks={home.data.blocks} />
+    ) : (
+      <section class="px-4 py-16 sm:px-6 mx-auto lg:px-8 lg:py-20 max-w-4xl">
+        <h1 class="font-bold font-heading text-4xl md:text-5xl">Home</h1>
+        <p class="mt-4 text-muted">Placeholder. Add your homepage content here.</p>
+      </section>
+    )
+  }
+</Layout>

@@ -1,0 +1,34 @@
+---
+import { business } from '~/config/business';
+
+export interface Props {
+  /** Name of the service, e.g. "Boiler Servicing" */
+  name: string;
+  description?: string;
+  /** Defaults to the business name from config */
+  provider?: string;
+  /** Geographic area, e.g. "Co. Kerry" or "Kerry and West Cork" */
+  areaServed?: string;
+}
+
+const {
+  name,
+  description,
+  provider = business.name,
+  areaServed = `${business.address.locality}, ${business.address.region}`,
+} = Astro.props;
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name,
+  ...(description ? { description } : {}),
+  provider: {
+    '@type': 'LocalBusiness',
+    name: provider,
+  },
+  areaServed,
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

@@ -1,0 +1,90 @@
+---
+import { ANALYTICS } from 'astrowind:config';
+import { getPermalink } from '~/utils/permalinks';
+
+// Cookie consent banner tied to Google Analytics. It only appears when a GA4
+// id is configured (that's the only thing here that sets non-essential
+// cookies) and the visitor hasn't chosen yet. Accept/Decline is stored in
+// localStorage and drives GA Consent Mode via gtag('consent', 'update', ...).
+// No GA id → no non-essential cookies → no banner needed.
+const gaId = ANALYTICS?.vendors?.googleAnalytics?.id ? String(ANALYTICS.vendors.googleAnalytics.id) : '';
+const privacyHref = getPermalink('/privacy');
+
+// The banner logic is injected as a string via set:html rather than written as
+// raw <script> children. A <script> nested inside a {cond && (...)} block is
+// parsed in a JSX context, where the `{` of a JS block reads as an expression
+// delimiter and breaks tooling. Keeping the JS in a frontmatter string sidesteps
+// that entirely.
+const bannerScript = `
+  (function () {
+    if (window.awCookieConsentReady) return;
+    window.awCookieConsentReady = true;
+
+    function apply(value) {
+      var g = value === 'granted' ? 'granted' : 'denied';
+      try { localStorage.setItem('aw-cookie-consent', value); } catch (e) {}
+      if (typeof window.gtag === 'function') {
+        window.gtag('consent', 'update', {
+          ad_storage: g, ad_user_data: g, ad_personalization: g, analytics_storage: g
+        });
+      }
+    }
+
+    function init() {
+      var banner = document.getElementById('aw-cookie-consent');
+      if (!banner) return;
+
+      var choice = null;
+      try { choice = localStorage.getItem('aw-cookie-consent'); } catch (e) {}
+
+      if (choice === 'granted' || choice === 'denied') {
+        banner.setAttribute('hidden', '');
+      } else {
+        banner.removeAttribute('hidden');
+      }
+
+      var accept = document.getElementById('aw-cookie-accept');
+      var decline = document.getElementById('aw-cookie-decline');
+      if (accept) accept.onclick = function () { apply('granted'); banner.setAttribute('hidden', ''); };
+      if (decline) decline.onclick = function () { apply('denied'); banner.setAttribute('hidden', ''); };
+    }
+
+    // Fires on first load and after every View Transition navigation.
+    document.addEventListener('astro:page-load', init);
+  })();
+`;
+---
+
+{
+  gaId && (
+    <div
+      id="aw-cookie-consent"
+      hidden
+      role="dialog"
+      aria-live="polite"
+      aria-label="Cookie consent"
+      class="fixed inset-x-0 bottom-0 z-50 p-4 sm:p-6"
+    >
+      <div class="max-w-4xl mx-auto rounded-lg border border-gray-200 dark:border-slate-700 bg-page dark:bg-dark shadow-lg p-4 md:p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <p class="text-sm text-muted dark:text-gray-400">
+          We use cookies to analyse site traffic and improve your experience. You can accept or decline analytics
+          cookies. See our{' '}
+          <a href={privacyHref} class="text-primary font-medium hover:underline underline-offset-2">
+            Privacy Policy
+          </a>
+          .
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 shrink-0">
+          <button type="button" id="aw-cookie-decline" class="btn-secondary">
+            Decline
+          </button>
+          <button type="button" id="aw-cookie-accept" class="btn-primary">
+            Accept
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+{gaId && <script is:inline set:html={bannerScript} />}

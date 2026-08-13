@@ -1,0 +1,159 @@
+---
+export const prerender = false;
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { requireUser, isAdmin } from '~/lib/cms/auth';
+import { cmsAvailable } from '~/lib/cms/env';
+import { allOverrides, revertOverride, revisionsFor } from '~/lib/cms/page-content';
+import { KEY_PATTERN, overrideKey, pathFromKey } from '~/lib/cms/editable';
+import { invalidateOverrides } from '~/middleware';
+import { log } from '~/lib/cms/activity';
+
+const user = await requireUser(Astro.cookies);
+if (!user) return Astro.redirect(`/admin/login?next=${encodeURIComponent(Astro.url.pathname)}`);
+// Admin only. A viewer signs in to read the document lists and nothing else,
+// so anything that changes the website redirects them away rather than showing
+// a screen full of controls that will refuse to work.
+if (!isAdmin(user)) return Astro.redirect('/admin');
+
+let notice: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const key = overrideKey(String(form.get('key') ?? ''));
+
+  if (KEY_PATTERN.test(key)) {
+    await revertOverride(key, user);
+    // Drop the middleware's cached copy for that page. Without this the revert
+    // succeeds, says so, and the public page keeps serving the old wording for
+    // up to a minute — which reads as "the button didn't work".
+    invalidateOverrides(key.split(':')[0]);
+    await log(user, 'reverted', `Put “${key}” back to the original wording`);
+    notice = 'That text is back to the original wording.';
+  } else {
+    notice = 'That change could not be found.';
+  }
+}
+
+const configured = await cmsAvailable();
+const rows = configured ? await allOverrides() : [];
+
+// Expand one region's history when asked, rather than loading every revision
+// for every row on a page that is usually just being skimmed.
+const historyKey = overrideKey(Astro.url.searchParams.get('history') ?? '');
+const history = KEY_PATTERN.test(historyKey) ? await revisionsFor(historyKey) : [];
+
+const when = (value: string) =>
+  new Date(value.replace(' ', 'T') + 'Z').toLocaleString('en-IE', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** The region name without its page prefix — the half a person can read. */
+const regionOf = (key: string) => key.slice(key.indexOf(':') + 1);
+---
+
+<AdminLayout title="Edited text" user={user}>
+  <h1 class="font-heading text-2xl font-semibold tracking-tight">Edited text</h1>
+  <p class="mt-2 text-slate-600 dark:text-slate-400">
+    Every piece of wording that has been changed from what the site was built with. Putting one back doesn’t delete
+    anything — the original text lives in the site itself, which is what it returns to.
+  </p>
+
+  {
+    notice && (
+      <p
+        role="status"
+        class="mt-6 rounded-md border border-slate-300 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+      >
+        {notice}
+      </p>
+    )
+  }
+
+  {
+    rows.length === 0 ? (
+      <p class="mt-8 rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-slate-500 dark:border-slate-700">
+        Nothing has been edited yet. Open a page from{' '}
+        <a class="underline underline-offset-4" href="/admin">
+          the overview
+        </a>{' '}
+        and click any highlighted text.
+      </p>
+    ) : (
+      <ul class="mt-8 space-y-3">
+        {rows.map((row) => {
+          const path = row.path || pathFromKey(row.key);
+          const open = historyKey === row.key;
+
+          return (
+            <li class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <a href={path} class="font-medium underline underline-offset-4">
+                  {path}
+                </a>
+                <span class="text-sm text-slate-500">{regionOf(row.key)}</span>
+                <span class="ms-auto text-sm text-slate-400">
+                  {row.editor ? `${row.editor} · ` : ''}
+                  {when(row.updated_at)}
+                </span>
+              </div>
+
+              {row.kind === 'image' ? (
+                <img
+                  src={row.value}
+                  alt=""
+                  class="mt-3 h-24 w-auto rounded-md border border-slate-200 dark:border-slate-700"
+                />
+              ) : (
+                <p class="mt-3 border-s-2 border-slate-200 ps-3 text-slate-800 dark:border-slate-700 dark:text-slate-200">
+                  {row.value}
+                </p>
+              )}
+
+              <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <a
+                  href={`${path}?edit=1`}
+                  class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  Edit on the page
+                </a>
+
+                {row.revisions > 0 && (
+                  <a
+                    href={open ? '/admin/pages' : `/admin/pages?history=${encodeURIComponent(row.key)}`}
+                    class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    {open ? 'Hide' : `Earlier versions (${row.revisions})`}
+                  </a>
+                )}
+
+                <form method="POST" class="ms-auto">
+                  <input type="hidden" name="key" value={row.key} />
+                  <button
+                    type="submit"
+                    class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    Put back the original
+                  </button>
+                </form>
+              </div>
+
+              {open && (
+                <ol class="mt-4 space-y-2 border-t border-slate-200 pt-4 text-sm dark:border-slate-800">
+                  {history.length === 0 ? (
+                    <li class="text-slate-500">No earlier versions kept.</li>
+                  ) : (
+                    history.map((rev) => (
+                      <li class="flex flex-wrap gap-x-3 text-slate-600 dark:text-slate-400">
+                        <span class="tabular-nums text-slate-400">{when(rev.saved_at)}</span>
+                        <span class="min-w-0 flex-1">{rev.value}</span>
+                      </li>
+                    ))
+                  )}
+                </ol>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    )
+  }
+</AdminLayout>

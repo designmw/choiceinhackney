@@ -1,0 +1,46 @@
+---
+import { getCanonical, getPermalink } from '~/utils/permalinks';
+
+// Visible breadcrumb trail + BreadcrumbList JSON-LD (for breadcrumb rich results
+// in Google). Pass the trail from Home to the current page; the last item is the
+// current page and is not linked.
+export interface Props {
+  items: Array<{ label: string; href?: string }>;
+}
+
+const { items } = Astro.props;
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: items.map((item, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    name: item.label,
+    ...(item.href ? { item: String(getCanonical(getPermalink(item.href))) } : {}),
+  })),
+};
+---
+
+<nav aria-label="Breadcrumb" class="not-prose text-sm">
+  <ol class="flex flex-wrap items-center gap-2 text-muted">
+    {
+      items.map((item, i) => (
+        <li class="flex items-center gap-2">
+          {item.href && i < items.length - 1 ? (
+            <a href={getPermalink(item.href)} class="hover:text-primary hover:underline">
+              {item.label}
+            </a>
+          ) : (
+            <span class="text-default" aria-current="page">
+              {item.label}
+            </span>
+          )}
+          {i < items.length - 1 && <span aria-hidden="true">/</span>}
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />

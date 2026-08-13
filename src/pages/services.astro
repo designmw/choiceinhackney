@@ -1,0 +1,55 @@
+---
+import { getCollection } from 'astro:content';
+import { Icon } from 'astro-icon/components';
+import Layout from '~/layouts/PageLayout.astro';
+import { getPermalink } from '~/utils/permalinks';
+
+const metadata = {
+  title: 'Services',
+};
+
+// Cards are generated from the `service` content collection (src/data/services/).
+const services = (await getCollection('service', ({ data }) => !data.draft)).sort(
+  (a, b) => (a.data.order ?? 999) - (b.data.order ?? 999)
+);
+---
+
+<Layout metadata={metadata}>
+  <section class="px-4 py-16 sm:px-6 mx-auto lg:px-8 lg:py-20 max-w-6xl">
+    <div class="max-w-3xl">
+      <h1 class="font-bold font-heading text-4xl md:text-5xl tracking-tight">Services</h1>
+      <p class="mt-4 text-xl text-muted">What we do — pick a service to learn more.</p>
+    </div>
+
+    {
+      services.length > 0 ? (
+        <div class="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {services.map((service) => (
+            <a
+              href={getPermalink(`/services/${service.id}`)}
+              class="group flex flex-col rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm hover:shadow-md hover:border-primary transition duration-150 ease-in-out"
+            >
+              {service.data.icon && (
+                <span class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800">
+                  <Icon name={service.data.icon} class="h-6 w-6 text-primary" aria-hidden="true" />
+                </span>
+              )}
+              <h2 class="font-semibold font-heading text-xl text-heading group-hover:text-primary">
+                {service.data.title}
+              </h2>
+              {service.data.excerpt && <p class="mt-2 text-muted">{service.data.excerpt}</p>}
+              <span class="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                Learn more
+                <Icon name="tabler:arrow-right" class="h-4 w-4" aria-hidden="true" />
+              </span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p class="mt-8 text-muted">
+          No services yet. Add Markdown files in <code>src/data/services/</code> to populate this page.
+        </p>
+      )
+    }
+  </section>
+</Layout>

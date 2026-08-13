@@ -1,0 +1,56 @@
+// Cloudflare config for this project (read by wrangler and by the
+// @astrojs/cloudflare adapter, which merges it with its own defaults and
+// emits the full deployable config to dist/server/wrangler.json at build).
+//
+// Per client site, change `name` — it becomes the Worker name. Add KV/D1/R2/etc.
+// bindings here if a site ever needs them; the adapter passes them through.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dmw-astro-base",
+  "compatibility_date": "2026-04-15",
+  // Do NOT serve the site on <name>.workers.dev. wrangler defaults this to true
+  // whenever a config declares no routes, which quietly publishes a second copy
+  // of every client site on a hostname that sits outside the zone — so no WAF,
+  // no redirect rules, no rate limiting, no Cloudflare Access (on Cork CIL that
+  // was an outright auth bypass), plus an indexable duplicate for SEO.
+  // The dashboard toggle alone is not enough: a deploy re-enables it.
+  //
+  // A site with this off and no route attached has NO public URL at all. For a
+  // spec/demo build that lives on its workers.dev address, either attach a
+  // <name>.dmwdev.com custom domain first, or set this back to true.
+  "workers_dev": false,
+  "preview_urls": false,
+  // nodejs_compat gives the workerd dev runtime a `process` global so
+  // console logging in on-demand routes doesn't crash.
+  "compatibility_flags": ["nodejs_compat"],
+  // Live page editor (docs/live-editor.md). Uncomment together with the
+  // LIVE_EDITOR switch in astro.config.ts, then:
+  //
+  //   npx wrangler d1 create <site>-db     # paste the id below
+  //   npm run cms:init                     # create the tables locally
+  //   npm run cms:user -- you@example.ie   # create your login
+  //
+  // The binding name must stay "DB" — src/lib/cms/env.ts looks for it by name.
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "CHANGE-ME-db",
+  //     "database_id": "CHANGE-ME",
+  //     "migrations_dir": "migrations"
+  //   }
+  // ],
+  // Per-IP rate limit for the contact form. Each submission costs two Brevo
+  // sends (the enquiry and the acknowledgement), so an unmetered endpoint is a
+  // billing risk and a way to push mail at a third party. Consumed in
+  // src/pages/api/contact.ts; absent in local dev, where it no-ops.
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "CONTACT_RATE_LIMIT",
+        "type": "ratelimit",
+        "namespace_id": "1001",
+        "simple": { "limit": 5, "period": 60 }
+      }
+    ]
+  }
+}

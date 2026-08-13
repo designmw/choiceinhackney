@@ -1,0 +1,80 @@
+---
+export const prerender = false;
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { requireUser, isAdmin } from '~/lib/cms/auth';
+import { cms } from '~/config/cms';
+import { getPortal } from '~/lib/cms/portals';
+
+const user = await requireUser(Astro.cookies);
+if (!user) return Astro.redirect(`/admin/login?next=${encodeURIComponent(Astro.url.pathname)}`);
+if (!cms.portals.enabled) return Astro.redirect('/admin');
+
+// Viewers reach this page: reading the document lists is the whole point of a
+// viewer account. Only the management screens behind it are restricted.
+const canManage = isAdmin(user);
+
+const areas = await Promise.all(
+  cms.portals.areas.map(async (area) => {
+    const sections = await getPortal(area.slug);
+    return {
+      ...area,
+      sections: sections?.length ?? 0,
+      documents: sections?.reduce((n, s) => n + s.documents.length, 0) ?? 0,
+      failed: sections === null,
+    };
+  })
+);
+---
+
+<AdminLayout title="Portals" user={user}>
+  <h1 class="font-heading text-2xl font-semibold tracking-tight">Portals</h1>
+  <p class="mt-2 text-slate-600 dark:text-slate-400">
+    Private areas of the website where documents are kept for a specific group.
+  </p>
+
+  <ul class="mt-6 space-y-3">
+    {
+      areas.map((area) => (
+        <li class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
+          <div>
+            <div class="font-medium">{area.label}</div>
+            <div class="text-sm text-slate-500">
+              {area.failed
+                ? 'Could not load this portal.'
+                : `${area.sections} ${area.sections === 1 ? 'section' : 'sections'} · ${area.documents} ${area.documents === 1 ? 'document' : 'documents'}`}
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 text-sm sm:ms-auto">
+            <a
+              href={`/${area.slug}`}
+              class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:border-primary hover:text-primary dark:border-slate-700"
+            >
+              View portal
+            </a>
+            <a
+              href={`/admin/portals/${area.slug}`}
+              class="rounded-md bg-primary px-2.5 py-1.5 font-medium text-white transition hover:bg-secondary"
+            >
+              {canManage ? 'Manage documents' : 'See documents'}
+            </a>
+          </div>
+        </li>
+      ))
+    }
+  </ul>
+
+  <div
+    class="mt-8 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+  >
+    <h2 class="font-heading font-semibold text-slate-900 dark:text-slate-100">Who can see these documents</h2>
+    <p class="mt-2">
+      Access to each portal is controlled by Cloudflare Access, not by this dashboard. Adding or removing a person is
+      done in the Cloudflare Zero Trust dashboard, and changes there take effect immediately.
+    </p>
+    <p class="mt-2">
+      Anything uploaded here is only reachable by someone who has already passed that check. Uploading a document does
+      not make it public, but it does make it available to everyone with access to that portal.
+    </p>
+  </div>
+</AdminLayout>

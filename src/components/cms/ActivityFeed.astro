@@ -1,0 +1,165 @@
+---
+// Recent activity, as a timeline rather than a log dump.
+//
+// The first version was three columns — name, sentence, timestamp — with the
+// timestamp pushed to the far right by `ms-auto`. On a wide screen that left a
+// hand-span of empty space between an event and its time, so the eye had to
+// travel to pair them up, and the repeated "Tommy" down the left read as noise
+// rather than information.
+//
+// This groups by day, puts the time directly under the sentence it belongs to,
+// and gives each kind of action its own icon so the shape of the list is
+// readable before any of the words are.
+//
+// Icons are inline SVG rather than astro-icon on purpose: the admin is
+// deliberately self-contained, and astro-icon pulls a CJS dependency that the
+// Workers dev runtime needs prebundled to load at all.
+
+import type { ActivityRow } from '~/lib/cms/activity';
+
+export interface Props {
+  items: ActivityRow[];
+}
+
+const { items } = Astro.props;
+
+/** Icon and colour per kind of action, so a delete never looks like a sign-in. */
+const STYLES: Record<string, { path: string; tone: string }> = {
+  edited: {
+    path: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z',
+    tone: 'bg-primary/10 text-primary',
+  },
+  uploaded: {
+    path: 'M12 19V5M5 12l7-7 7 7',
+    tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200',
+  },
+  added: {
+    path: 'M12 5v14M5 12h14',
+    tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200',
+  },
+  reverted: {
+    path: 'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5',
+    tone: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200',
+  },
+  deleted: {
+    path: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+    tone: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200',
+  },
+  removed: {
+    path: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+    tone: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200',
+  },
+  'signed in': {
+    path: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3',
+    tone: 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+  },
+  updated: {
+    path: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z',
+    tone: 'bg-primary/10 text-primary',
+  },
+};
+
+const styleFor = (action: string) => STYLES[action] ?? STYLES.updated;
+
+/** SQLite stores UTC without a zone marker; make that explicit before parsing. */
+const parse = (value: string) => new Date(value.replace(' ', 'T') + 'Z');
+
+const now = Date.now();
+
+/** "just now" / "12 minutes ago" / "3 days ago" — exact time stays in the tooltip. */
+function relative(date: Date): string {
+  const seconds = Math.round((now - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+
+  const units: [number, Intl.RelativeTimeFormatUnit][] = [
+    [60, 'minute'],
+    [3600, 'hour'],
+    [86400, 'day'],
+    [604800, 'week'],
+    [2592000, 'month'],
+  ];
+
+  const format = new Intl.RelativeTimeFormat('en-IE', { numeric: 'auto' });
+  let chosen: [number, Intl.RelativeTimeFormatUnit] = units[0];
+  for (const unit of units) if (seconds >= unit[0]) chosen = unit;
+
+  return format.format(-Math.round(seconds / chosen[0]), chosen[1]);
+}
+
+/** 'Today' / 'Yesterday' / 'Tue 12 Aug' — the heading each group sits under. */
+function dayLabel(date: Date): string {
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOf(new Date(now)) - startOf(date)) / 86_400_000);
+
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return date.toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+// Group in one pass. The rows arrive newest first, so the groups come out in
+// the right order without a second sort.
+const groups: { label: string; rows: (ActivityRow & { date: Date })[] }[] = [];
+
+for (const row of items) {
+  const date = parse(row.at);
+  const label = dayLabel(date);
+  const last = groups.at(-1);
+  if (last?.label === label) last.rows.push({ ...row, date });
+  else groups.push({ label, rows: [{ ...row, date }] });
+}
+---
+
+{
+  groups.length > 0 && (
+    <div class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      {groups.map((group) => (
+        <section>
+          <h3 class="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:border-slate-800 dark:bg-slate-950/40">
+            {group.label}
+          </h3>
+
+          <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+            {group.rows.map((row) => {
+              const style = styleFor(row.action);
+              return (
+                <li class="flex items-start gap-3 px-4 py-3">
+                  <span
+                    aria-hidden="true"
+                    class:list={['mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full', style.tone]}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="size-3.5"
+                    >
+                      <path d={style.path} />
+                    </svg>
+                  </span>
+
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm text-slate-800 dark:text-slate-200">
+                      <span class="font-medium text-slate-900 dark:text-slate-100">{row.actor}</span> {row.summary}
+                    </p>
+                    {/* The exact timestamp stays available on hover and to a
+                        screen reader, so nothing is lost by showing "2 hours ago". */}
+                    <time
+                      datetime={row.date.toISOString()}
+                      title={row.date.toLocaleString('en-IE', { dateStyle: 'full', timeStyle: 'short' })}
+                      class="text-xs text-slate-400"
+                    >
+                      {relative(row.date)}
+                    </time>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
+}

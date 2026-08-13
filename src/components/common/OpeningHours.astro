@@ -1,0 +1,99 @@
+---
+import { business } from '~/config/business';
+
+// "Open now / Closed" badge + a formatted hours list, from business.openingHours
+// (schema.org format, e.g. "Mo-Fr 09:00-17:00"). Open/closed is computed in the
+// browser from the visitor's local time — fine for a local business whose
+// customers share its timezone.
+const specs = business.openingHours ?? [];
+
+const dayNames: Record<string, string> = {
+  Mo: 'Mon',
+  Tu: 'Tue',
+  We: 'Wed',
+  Th: 'Thu',
+  Fr: 'Fri',
+  Sa: 'Sat',
+  Su: 'Sun',
+};
+
+const rows = specs.map((spec) => {
+  const [days = '', time = ''] = spec.trim().split(/\s+/);
+  const label = days
+    .split(',')
+    .map((tok) =>
+      tok.includes('-')
+        ? tok
+            .split('-')
+            .map((d) => dayNames[d] ?? d)
+            .join('–')
+        : (dayNames[tok] ?? tok)
+    )
+    .join(', ');
+  return { days: label, time: time.replace('-', '–') };
+});
+
+const script = `
+  (function () {
+    if (!window.awOpeningHoursInit) {
+      window.awOpeningHoursInit = true;
+      document.addEventListener('astro:page-load', awUpdateOpenStatus);
+    }
+    function awUpdateOpenStatus() {
+      var el = document.getElementById('aw-open-status');
+      if (!el) return;
+      var specs = ${JSON.stringify(specs)};
+      var order = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+      var now = new Date();
+      var day = now.getDay();
+      var mins = now.getHours() * 60 + now.getMinutes();
+      function toMin(t) { var p = t.split(':'); return parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10); }
+      function days(s) {
+        var out = [];
+        s.split(',').forEach(function (tok) {
+          if (tok.indexOf('-') !== -1) {
+            var a = tok.split('-'); var s0 = order.indexOf(a[0]); var e0 = order.indexOf(a[1]);
+            for (var d = s0; d <= e0; d++) out.push(d);
+          } else { out.push(order.indexOf(tok)); }
+        });
+        return out;
+      }
+      var open = false;
+      for (var i = 0; i < specs.length; i++) {
+        var parts = specs[i].trim().split(/\\s+/);
+        if (!parts[1] || days(parts[0]).indexOf(day) === -1) continue;
+        var tr = parts[1].split('-');
+        if (mins >= toMin(tr[0]) && mins < toMin(tr[1])) { open = true; break; }
+      }
+      el.style.color = open ? '#16a34a' : '#6b7280';
+      var label = el.querySelector('[data-open-label]');
+      if (label) label.textContent = open ? 'Open now' : 'Closed';
+    }
+    awUpdateOpenStatus();
+  })();
+`;
+---
+
+{
+  rows.length > 0 && (
+    <div class="not-prose">
+      <div class="flex items-center gap-2 font-semibold text-heading">
+        Opening hours
+        <span id="aw-open-status" class="inline-flex items-center gap-1.5 text-sm font-medium text-muted">
+          <span class="w-2 h-2 rounded-full bg-current" />
+          <span data-open-label>Hours</span>
+        </span>
+      </div>
+      <dl class="mt-2 text-sm text-muted">
+        {rows.map((row) => (
+          <div class="flex justify-between gap-6 py-0.5">
+            <dt>{row.days}</dt>
+            <dd class="tabular-nums">{row.time}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+{rows.length > 0 && <script is:inline set:html={script} />}

@@ -1,0 +1,444 @@
+---
+export const prerender = false;
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { requireUser, isAdmin } from '~/lib/cms/auth';
+import { cms } from '~/config/cms';
+import {
+  getPortal,
+  createSection,
+  updateSection,
+  deleteSection,
+  moveSection,
+  addDocument,
+  updateDocument,
+  deleteDocument,
+  moveDocument,
+  documentHref,
+  DOCUMENT_TYPES,
+  MAX_UPLOAD_BYTES,
+} from '~/lib/cms/portals';
+import { log } from '~/lib/cms/activity';
+
+const user = await requireUser(Astro.cookies);
+if (!user) return Astro.redirect(`/admin/login?next=${encodeURIComponent(Astro.url.pathname)}`);
+if (!cms.portals.enabled) return Astro.redirect('/admin');
+
+// The area must be one this site declares. Taking it from the URL unchecked
+// would let anyone create a portal area with no matching Cloudflare Access
+// policy — which is a folder of documents with no gate in front of it.
+const area = cms.portals.areas.find((a) => a.slug === Astro.params.area);
+if (!area) return Astro.redirect('/admin/portals');
+
+// A viewer may read this page but change nothing on it. Every form below is
+// hidden from them, and the POST handler refuses regardless — a hidden form is
+// a UI decision, not a permission check.
+const canManage = isAdmin(user);
+
+let error: string | null = null;
+let notice: string | null = null;
+
+if (Astro.request.method === 'POST' && !canManage) {
+  error = 'Your account can view these documents but not change them.';
+} else if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = String(form.get('action') ?? '');
+
+  try {
+    if (action === 'section-create') {
+      const title = String(form.get('title') ?? '').trim();
+      if (!title) error = 'Give the section a name.';
+      else {
+        await createSection(area.slug, title.slice(0, 200));
+        notice = `Added the “${title}” section.`;
+      }
+    } else if (action === 'section-update') {
+      await updateSection(
+        Number(form.get('id')),
+        String(form.get('title') ?? '').slice(0, 200),
+        String(form.get('intro') ?? '').slice(0, 2000)
+      );
+      notice = 'Section updated.';
+    } else if (action === 'section-delete') {
+      await deleteSection(Number(form.get('id')));
+      await log(user, 'deleted', `Deleted a section from the ${area.label}`);
+      notice = 'Section and its documents deleted.';
+    } else if (action === 'section-up' || action === 'section-down') {
+      await moveSection(Number(form.get('id')), action === 'section-up' ? 'up' : 'down');
+    } else if (action === 'doc-create') {
+      const title = String(form.get('title') ?? '').trim();
+      const link = String(form.get('link') ?? '').trim();
+      const file = form.get('file');
+      const sectionId = Number(form.get('section_id'));
+
+      if (!title) {
+        error = 'Give the document a name.';
+      } else if (link && !/^https?:\/\//i.test(link)) {
+        // Only http(s). An editor-supplied `javascript:` URL here would run for
+        // every signed-in staff member who clicked it.
+        error = 'A link must start with http:// or https://';
+      } else if (file instanceof File && file.size > 0) {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          error = `Files must be under ${Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.`;
+        } else if (!DOCUMENT_TYPES.includes((file.type || '').toLowerCase())) {
+          error = 'That file type is not allowed. Use PDF, Word, Excel, PowerPoint, CSV, text or an image.';
+        } else {
+          await addDocument({
+            sectionId,
+            title: title.slice(0, 200),
+            file: { bytes: await file.arrayBuffer(), filename: file.name, contentType: file.type.toLowerCase() },
+            user,
+          });
+          await log(user, 'uploaded', `Added “${title}” to the ${area.label}`);
+          notice = `Added “${title}”.`;
+        }
+      } else if (link) {
+        await addDocument({ sectionId, title: title.slice(0, 200), link, user });
+        notice = `Added “${title}”.`;
+      } else {
+        error = 'Either upload a file or paste a link.';
+      }
+    } else if (action === 'doc-update') {
+      await updateDocument(
+        String(form.get('id') ?? ''),
+        String(form.get('title') ?? '').slice(0, 200),
+        form.get('featured') === 'on'
+      );
+      notice = 'Document updated.';
+    } else if (action === 'doc-delete') {
+      await deleteDocument(String(form.get('id') ?? ''));
+      await log(user, 'deleted', `Deleted a document from the ${area.label}`);
+      notice = 'Document deleted.';
+    } else if (action === 'doc-up' || action === 'doc-down') {
+      await moveDocument(String(form.get('id') ?? ''), action === 'doc-up' ? 'up' : 'down');
+    }
+  } catch (err) {
+    console.error('[cms] portal action failed:', err);
+    error = 'That did not work. Please try again.';
+  }
+}
+
+const sections = await getPortal(area.slug);
+const failed = sections === null;
+
+const sizeLabel = (bytes: number) =>
+  bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+const inputClass =
+  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900';
+const ghostButton =
+  'rounded-md border border-slate-300 px-2.5 py-1.5 text-sm transition hover:border-primary hover:text-primary dark:border-slate-700';
+---
+
+<AdminLayout title={area.label} user={user}>
+  <p class="text-sm">
+    <a href="/admin/portals" class="text-slate-500 underline underline-offset-4 hover:text-primary">Portals</a>
+  </p>
+  <h1 class="mt-1 font-heading text-2xl font-semibold tracking-tight">{area.label}</h1>
+  <p class="mt-2 text-slate-600 dark:text-slate-400">
+    Documents here are only visible to people who can sign in to <code>/{area.slug}</code>.
+  </p>
+
+  {
+    (error || notice) && (
+      <p
+        role={error ? 'alert' : 'status'}
+        class:list={[
+          'mt-6 rounded-md border px-4 py-3 text-sm',
+          error
+            ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200'
+            : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
+        ]}
+      >
+        {error ?? notice}
+      </p>
+    )
+  }
+
+  {
+    failed ? (
+      <p class="mt-8 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+        Could not load this portal. The documents are still there; try again in a moment.
+      </p>
+    ) : (
+      <>
+        {sections.length === 0 && (
+          <p class="mt-8 rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-slate-500 dark:border-slate-700">
+            No sections yet. Add one below to start putting documents in.
+          </p>
+        )}
+
+        <div class="mt-6 space-y-6">
+          {sections.map((section, index) => (
+            <section class="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+              <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 p-4 dark:border-slate-800">
+                <h2 class="font-heading text-lg font-semibold">{section.title}</h2>
+                <span class="text-sm text-slate-400">
+                  {section.documents.length} {section.documents.length === 1 ? 'document' : 'documents'}
+                </span>
+
+                {canManage && (
+                  <div class="flex w-full flex-wrap gap-2 sm:ms-auto sm:w-auto">
+                    <form method="POST">
+                      <input type="hidden" name="action" value="section-up" />
+                      <input type="hidden" name="id" value={section.id} />
+                      <button type="submit" class={ghostButton} disabled={index === 0} aria-label="Move section up">
+                        ↑
+                      </button>
+                    </form>
+                    <form method="POST">
+                      <input type="hidden" name="action" value="section-down" />
+                      <input type="hidden" name="id" value={section.id} />
+                      <button
+                        type="submit"
+                        class={ghostButton}
+                        disabled={index === sections.length - 1}
+                        aria-label="Move section down"
+                      >
+                        ↓
+                      </button>
+                    </form>
+                    <form
+                      method="POST"
+                      data-confirm={`Delete the “${section.title}” section and all ${section.documents.length} of its documents? This cannot be undone.`}
+                    >
+                      <input type="hidden" name="action" value="section-delete" />
+                      <input type="hidden" name="id" value={section.id} />
+                      <button
+                        type="submit"
+                        class={`${ghostButton} text-slate-500 hover:border-red-400 hover:text-red-700`}
+                      >
+                        Delete section
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              <div class="space-y-4 p-4">
+                {canManage && (
+                  <details>
+                    <summary class="cursor-pointer text-sm text-slate-500 hover:text-primary">
+                      Rename this section or add an introduction
+                    </summary>
+                    <form method="POST" class="mt-3 space-y-3">
+                      <input type="hidden" name="action" value="section-update" />
+                      <input type="hidden" name="id" value={section.id} />
+                      <div>
+                        <label for={`title-${section.id}`} class="block text-sm font-medium">
+                          Section name
+                        </label>
+                        <input
+                          id={`title-${section.id}`}
+                          name="title"
+                          value={section.title}
+                          class={`mt-1 ${inputClass}`}
+                        />
+                      </div>
+                      <div>
+                        <label for={`intro-${section.id}`} class="block text-sm font-medium">
+                          Introduction (optional)
+                        </label>
+                        <textarea id={`intro-${section.id}`} name="intro" rows="2" class={`mt-1 ${inputClass}`}>
+                          {section.intro}
+                        </textarea>
+                      </div>
+                      <button
+                        type="submit"
+                        class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-secondary"
+                      >
+                        Save section
+                      </button>
+                    </form>
+                  </details>
+                )}
+
+                {section.documents.length > 0 && (
+                  <ul class="divide-y divide-slate-200 dark:divide-slate-800">
+                    {section.documents.map((doc, docIndex) => (
+                      <li class="py-3">
+                        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <a
+                            href={documentHref(area.slug, doc)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="font-medium text-primary underline underline-offset-4"
+                          >
+                            {doc.title}
+                          </a>
+                          {Boolean(doc.featured) && (
+                            <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                              Pinned to the top
+                            </span>
+                          )}
+                          <span class="text-sm text-slate-400">
+                            {doc.link ? 'External link' : `${doc.filename} · ${sizeLabel(doc.size)}`}
+                          </span>
+                        </div>
+
+                        {canManage && (
+                          <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <form method="POST" class="flex flex-wrap items-center gap-2">
+                              <input type="hidden" name="action" value="doc-update" />
+                              <input type="hidden" name="id" value={doc.id} />
+                              <label for={`doc-title-${doc.id}`} class="sr-only">
+                                Document name
+                              </label>
+                              <input
+                                id={`doc-title-${doc.id}`}
+                                name="title"
+                                value={doc.title}
+                                class="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm sm:w-64 dark:border-slate-700 dark:bg-slate-900"
+                              />
+                              <label class="flex items-center gap-1.5 text-sm">
+                                <input type="checkbox" name="featured" checked={Boolean(doc.featured)} />
+                                Pin to top
+                              </label>
+                              <button type="submit" class={ghostButton}>
+                                Save
+                              </button>
+                            </form>
+
+                            <form method="POST">
+                              <input type="hidden" name="action" value="doc-up" />
+                              <input type="hidden" name="id" value={doc.id} />
+                              <button type="submit" class={ghostButton} disabled={docIndex === 0} aria-label="Move up">
+                                ↑
+                              </button>
+                            </form>
+                            <form method="POST">
+                              <input type="hidden" name="action" value="doc-down" />
+                              <input type="hidden" name="id" value={doc.id} />
+                              <button
+                                type="submit"
+                                class={ghostButton}
+                                disabled={docIndex === section.documents.length - 1}
+                                aria-label="Move down"
+                              >
+                                ↓
+                              </button>
+                            </form>
+
+                            <form
+                              method="POST"
+                              class="ms-auto"
+                              data-confirm={`Delete “${doc.title}”? This cannot be undone.`}
+                            >
+                              <input type="hidden" name="action" value="doc-delete" />
+                              <input type="hidden" name="id" value={doc.id} />
+                              <button
+                                type="submit"
+                                class={`${ghostButton} text-slate-500 hover:border-red-400 hover:text-red-700`}
+                              >
+                                Delete
+                              </button>
+                            </form>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {canManage && (
+                  <details class="rounded-md border border-dashed border-slate-300 p-3 dark:border-slate-700">
+                    <summary class="cursor-pointer text-sm font-medium">Add a document to this section</summary>
+                    <form method="POST" enctype="multipart/form-data" class="mt-3 space-y-3">
+                      <input type="hidden" name="action" value="doc-create" />
+                      <input type="hidden" name="section_id" value={section.id} />
+
+                      <div>
+                        <label for={`new-title-${section.id}`} class="block text-sm font-medium">
+                          What is it called?
+                        </label>
+                        <input
+                          id={`new-title-${section.id}`}
+                          name="title"
+                          required
+                          placeholder="e.g. Mileage claim form"
+                          class={`mt-1 ${inputClass}`}
+                        />
+                      </div>
+
+                      <div>
+                        <label for={`new-file-${section.id}`} class="block text-sm font-medium">
+                          Upload a file
+                        </label>
+                        <input
+                          id={`new-file-${section.id}`}
+                          name="file"
+                          type="file"
+                          class="mt-1 block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+                        />
+                        <p class="mt-1 text-sm text-slate-500">
+                          PDF, Word, Excel, PowerPoint, CSV, text or an image. Up to{' '}
+                          {Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label for={`new-link-${section.id}`} class="block text-sm font-medium">
+                          …or link to something instead
+                        </label>
+                        <input
+                          id={`new-link-${section.id}`}
+                          name="link"
+                          type="url"
+                          placeholder="https://…"
+                          class={`mt-1 ${inputClass}`}
+                        />
+                        <p class="mt-1 text-sm text-slate-500">For an online form that lives somewhere else.</p>
+                      </div>
+
+                      <button
+                        type="submit"
+                        class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-secondary"
+                      >
+                        Add document
+                      </button>
+                    </form>
+                  </details>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        {canManage && (
+          <form
+            method="POST"
+            class="mt-8 flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 p-4 sm:flex-row sm:items-end dark:border-slate-700"
+          >
+            <input type="hidden" name="action" value="section-create" />
+            <div class="flex-1">
+              <label for="new-section" class="block text-sm font-medium">
+                Add a new section
+              </label>
+              <input
+                id="new-section"
+                name="title"
+                required
+                placeholder="e.g. Policies and procedures"
+                class={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <button
+              type="submit"
+              class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-secondary"
+            >
+              Add section
+            </button>
+          </form>
+        )}
+      </>
+    )
+  }
+</AdminLayout>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>('form[data-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (!confirm(form.dataset.confirm ?? 'Are you sure?')) event.preventDefault();
+    });
+  });
+</script>

@@ -1,0 +1,35 @@
+---
+export interface Props {
+  /** Accessible name for the button. Must contain the visible `text` (WCAG 2.5.3 Label in Name). */
+  label?: string;
+  /** Visible label beside the hamburger — a bare icon is not obvious enough on its own. */
+  text?: string;
+  class?: string;
+}
+
+const {
+  label = 'Toggle Menu',
+  text = 'Menu',
+  class: className = 'flex items-center gap-2 h-12 px-2 rounded justify-center cursor-pointer group',
+} = Astro.props;
+
+const barClass = 'h-0.5 w-6 my-1 rounded-full bg-black dark:bg-white transition ease transform duration-200 opacity-80';
+---
+
+<button
+  type="button"
+  class={className}
+  aria-label={label}
+  aria-expanded="false"
+  aria-controls="header-nav"
+  data-aw-toggle-menu
+>
+  <slot>
+    <span class="flex flex-col items-center justify-center" aria-hidden="true">
+      <span class:list={[barClass, 'group-[.expanded]:rotate-45 group-[.expanded]:translate-y-2.5']}></span>
+      <span class:list={[barClass, 'group-[.expanded]:opacity-0']}></span>
+      <span class:list={[barClass, 'group-[.expanded]:-rotate-45 group-[.expanded]:-translate-y-2.5']}></span>
+    </span>
+  </slot>
+  {text && <span class="text-sm font-medium text-default">{text}</span>}
+</button>

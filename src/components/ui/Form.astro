@@ -1,0 +1,131 @@
+---
+import type { Form as Props } from '~/types';
+import Button from '~/components/ui/Button.astro';
+
+const { inputs, textarea, disclaimer, button = 'Contact us', description = '', id = 'contact-form' } = Astro.props;
+
+// Cloudflare Turnstile (free bot protection). Rendered only when a public site
+// key is set (PUBLIC_TURNSTILE_SITE_KEY). The widget is rendered explicitly by
+// the page script so it survives View Transitions; server-side verification
+// lives in src/pages/api/contact.ts (TURNSTILE_SECRET_KEY).
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
+
+/*
+  WCAG 1.3.5 Identify Input Purpose needs the specific token ("email", "tel"),
+  not the bare "on" this component used to default to. Inferred from the field
+  name/type so existing pages get it for free; an explicit `autocomplete` on the
+  input definition still wins.
+*/
+const autocompleteFor = (name: string, type: string) => {
+  const n = name.toLowerCase();
+  if (type === 'email' || n.includes('email')) return 'email';
+  if (type === 'tel' || n.includes('phone') || n.includes('tel')) return 'tel';
+  if (n === 'name' || n.includes('fullname') || n.includes('full-name')) return 'name';
+  if (n.includes('firstname')) return 'given-name';
+  if (n.includes('lastname') || n.includes('surname')) return 'family-name';
+  if (n.includes('company') || n.includes('business') || n.includes('organisation')) return 'organization';
+  if (n.includes('url') || n.includes('website') || type === 'url') return 'url';
+  return 'on';
+};
+---
+
+<form id={id}>
+  {/* Honeypot: bots fill this, humans don't see it */}
+  <div aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;pointer-events:none;">
+    <label for="website">Leave this blank</label>
+    <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+  </div>
+
+  {
+    inputs &&
+      inputs.map(
+        ({ type = 'text', name, label = '', autocomplete = '', placeholder = '' }) =>
+          name && (
+            <div class="mb-6">
+              {label && (
+                <label for={name} class="block text-sm font-medium">
+                  {label}
+                </label>
+              )}
+              <input
+                type={type}
+                name={name}
+                id={name}
+                autocomplete={autocomplete || autocompleteFor(name, type)}
+                placeholder={placeholder}
+                class="py-3 px-4 block w-full text-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900"
+              />
+            </div>
+          )
+      )
+  }
+
+  {
+    textarea && (
+      <div>
+        <label for="textarea" class="block text-sm font-medium">
+          {textarea.label}
+        </label>
+        <textarea
+          id="textarea"
+          name={textarea.name ? textarea.name : 'message'}
+          rows={textarea.rows ? textarea.rows : 4}
+          placeholder={textarea.placeholder}
+          class="py-3 px-4 block w-full text-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900"
+        />
+      </div>
+    )
+  }
+
+  {
+    disclaimer && (
+      <div class="mt-3 flex items-start">
+        <div class="flex mt-0.5">
+          <input
+            id="disclaimer"
+            name="disclaimer"
+            type="checkbox"
+            class="cursor-pointer mt-1 py-3 px-4 block w-full text-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900"
+          />
+        </div>
+        <div class="ml-3">
+          <label for="disclaimer" class="cursor-pointer select-none text-sm text-gray-600 dark:text-gray-400">
+            {disclaimer.label}
+          </label>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    turnstileSiteKey && (
+      <div class="mt-6 flex justify-center">
+        <div id="cf-turnstile" data-sitekey={turnstileSiteKey} />
+      </div>
+    )
+  }
+
+  {
+    button && (
+      <div class="mt-10 grid">
+        <Button variant="primary" type="submit">
+          {button}
+        </Button>
+      </div>
+    )
+  }
+
+  {
+    description && (
+      <div class="mt-3 text-center">
+        <p class="text-sm text-gray-600 dark:text-gray-400">{description}</p>
+      </div>
+    )
+  }
+</form>
+
+{
+  turnstileSiteKey && (
+    <script is:inline async defer src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" />
+  )
+}

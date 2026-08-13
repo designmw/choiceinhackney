@@ -1,0 +1,130 @@
+---
+import { Icon } from 'astro-icon/components';
+import Logo from '~/components/Logo.astro';
+import { getHomePermalink } from '~/utils/permalinks';
+
+interface Link {
+  text?: string;
+  href?: string;
+  ariaLabel?: string;
+  icon?: string;
+}
+
+interface Links {
+  title?: string;
+  links: Array<Link>;
+}
+
+export interface Props {
+  links: Array<Links>;
+  secondaryLinks: Array<Link>;
+  socialLinks: Array<Link>;
+  description?: string;
+  footNote?: string;
+  theme?: string;
+}
+
+const {
+  socialLinks = [],
+  secondaryLinks = [],
+  links = [],
+  description = '',
+  footNote = '',
+  theme = 'light',
+} = Astro.props;
+---
+
+<footer class:list={[{ dark: theme === 'dark' }, 'relative border-t border-gray-200 dark:border-slate-800 not-prose']}>
+  <div class="dark:bg-dark absolute inset-0 pointer-events-none" aria-hidden="true"></div>
+  <div
+    class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 dark:text-slate-300 intersect-once intersect-quarter intersect-no-queue motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade"
+  >
+    <div class="grid grid-cols-1 gap-8 gap-y-10 py-12 md:py-16 lg:grid-cols-12">
+      <!-- Brand column: logo, supporting description, legal links -->
+      <div class="lg:col-span-5">
+        <a class="inline-flex items-center" href={getHomePermalink()} aria-label="Home">
+          <Logo />
+        </a>
+        {description && <p class="mt-4 max-w-md text-sm text-muted dark:text-gray-400" set:html={description} />}
+        {
+          secondaryLinks.length > 0 && (
+            <div class="mt-6 flex flex-wrap items-center gap-1 text-sm">
+              {secondaryLinks.map(({ text, href }, index) => (
+                <>
+                  {index !== 0 ? <span aria-hidden="true"> · </span> : ''}
+                  <a
+                    class="text-muted hover:text-gray-700 dark:text-gray-400 hover:underline transition duration-150 ease-in-out"
+                    href={href}
+                    set:html={text}
+                  />
+                </>
+              ))}
+            </div>
+          )
+        }
+      </div>
+
+      <!-- Link columns, evenly spread across the remaining width -->
+      {
+        links.length > 0 && (
+          <div class="grid grid-cols-1 gap-8 gap-y-10 sm:grid-cols-2 lg:col-span-7 lg:grid-cols-none lg:grid-flow-col lg:auto-cols-fr">
+            {links.map(({ title, links: groupLinks }) => (
+              <div>
+                <div class="mb-4 font-heading font-semibold dark:text-gray-300">{title}</div>
+                {groupLinks && Array.isArray(groupLinks) && groupLinks.length > 0 && (
+                  <ul class="space-y-3 text-sm">
+                    {groupLinks.map(({ text, href, ariaLabel, icon }) => (
+                      <li>
+                        {href ? (
+                          <a
+                            class="inline-flex items-center gap-2.5 text-muted hover:text-gray-700 hover:underline dark:text-gray-400 transition duration-150 ease-in-out"
+                            href={href}
+                            aria-label={ariaLabel}
+                          >
+                            {icon && <Icon name={icon} class="w-5 h-5 shrink-0" aria-hidden="true" />}
+                            <Fragment set:html={text} />
+                          </a>
+                        ) : (
+                          <span class="inline-flex items-center gap-2.5 text-muted dark:text-gray-400">
+                            {icon && <Icon name={icon} class="w-5 h-5 shrink-0" aria-hidden="true" />}
+                            <Fragment set:html={text} />
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </div>
+
+    <!-- Bottom bar: footnote left, social icons right -->
+    <div class="md:flex md:items-center md:justify-between py-6 md:py-8">
+      {
+        socialLinks.length > 0 && (
+          <ul class="flex mb-4 md:order-1 -ml-2 md:ml-4 md:mb-0 rtl:ml-0 rtl:-mr-2 rtl:md:ml-0 rtl:md:mr-4">
+            {socialLinks.map(({ ariaLabel, href, text, icon }) => (
+              <li>
+                <a
+                  class="text-muted dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5 inline-flex items-center"
+                  aria-label={ariaLabel}
+                  href={href}
+                >
+                  {icon && <Icon name={icon} class="w-5 h-5" aria-hidden="true" />}
+                  <Fragment set:html={text} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      <div class="text-sm mr-4 text-muted dark:text-slate-400">
+        <Fragment set:html={footNote} />
+      </div>
+    </div>
+  </div>
+</footer>

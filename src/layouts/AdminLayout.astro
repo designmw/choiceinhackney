@@ -1,0 +1,156 @@
+---
+// Chrome for /admin.
+//
+// Deliberately NOT PageLayout: the admin is a tool, not a page of the website.
+// Routing it through the public layout would drag in the site header, footer,
+// cookie banner, analytics and JSON-LD — none of which belong on a signed-in
+// screen, and one of which (analytics) would quietly log a client's private
+// admin usage to Google.
+//
+// It does, however, wear the client's branding. Two reasons that isn't just
+// decoration: a client who lands on a generic grey admin has no confirmation
+// they're on *their* site rather than a third-party service, and the whole
+// point of the live editor is that editing happens inside their own site
+// rather than in someone else's tool.
+//
+// The branding comes from the two pieces every clone already has — CustomStyles
+// (which defines --aw-color-primary and the brand font) and Logo — so this
+// self-brands per site with nothing to configure. Surfaces stay neutral so any
+// brand colour, light or dark, stays legible against them.
+
+import '~/assets/styles/tailwind.css';
+import CustomStyles from '~/components/CustomStyles.astro';
+import Logo from '~/components/Logo.astro';
+
+import { displayName, isAdmin, roleLabel, type CmsUser } from '~/lib/cms/auth';
+import { submissionCounts } from '~/lib/cms/submissions';
+import { cms } from '~/config/cms';
+
+export interface Props {
+  title: string;
+  user?: CmsUser | null;
+  /** Hide the nav on the sign-in screen, where there is nowhere to go yet. */
+  chrome?: boolean;
+}
+
+const { title, user = null, chrome = true } = Astro.props;
+
+// Unread enquiries are shown on the nav item itself. A count that only appears
+// once you visit the right screen is no use to someone checking whether
+// anything needs them today.
+// Only admins can open Enquiries, so only they get the count.
+const unread = chrome && isAdmin(user) ? (await submissionCounts().catch(() => null))?.unread : 0;
+
+// A viewer gets the overview and the documents, because that is everything a
+// viewer can do. Showing them tabs that redirect straight back would only
+// invite the question of why they don't work.
+const nav = [
+  { href: '/admin', label: 'Overview' },
+  { href: '/admin/messages', label: 'Enquiries', badge: unread, adminOnly: true },
+  { href: '/admin/pages', label: 'Edited text', adminOnly: true },
+  { href: '/admin/media', label: 'Images', adminOnly: true },
+  ...(cms.portals.enabled ? [{ href: '/admin/portals', label: 'Documents' }] : []),
+  { href: '/admin/users', label: 'Logins', adminOnly: true },
+];
+
+// Match the section, not just the exact page, so /admin/portals/staff still
+// highlights "Portals". '/admin' is special-cased or it would match everything.
+const path = Astro.url.pathname.replace(/\/$/, '') || '/admin';
+const isCurrent = (href: string) =>
+  href === '/admin' ? path === '/admin' : path === href || path.startsWith(`${href}/`);
+
+// The logo is authored for the site header, where it is large. Scale it down
+// here rather than editing Logo.astro, which every public page depends on.
+const logoScale = '[&_img]:h-9 [&_img]:w-auto [&_span]:text-lg';
+---
+
+<!doctype html>
+<html lang="en-IE" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* An admin screen must never be indexed, whatever the site's robots settings say. */}
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} · Site admin</title>
+    <CustomStyles />
+  </head>
+
+  <body class="h-full bg-slate-50 font-sans text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+    {/* A brand-coloured rule across the top, so the page reads as this client's. */}
+    <div class="h-1 bg-primary"></div>
+
+    {
+      chrome && (
+        <header class="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+            <a href="/admin" class:list={['flex items-center gap-3', logoScale]}>
+              <Logo />
+              <span class="sr-only">Site admin</span>
+            </a>
+
+            {/* Wraps to a second line on a phone rather than scrolling
+                sideways: six short labels fit in two rows at 360px, and a
+                hidden-offscreen nav item is a nav item nobody finds. */}
+            <nav
+              class="order-3 flex w-full flex-wrap items-center gap-1 text-sm md:order-none md:w-auto"
+              aria-label="Admin"
+            >
+              {nav
+                .filter((item) => !item.adminOnly || isAdmin(user))
+                .map((item) => (
+                  <a
+                    href={item.href}
+                    aria-current={isCurrent(item.href) ? 'page' : undefined}
+                    class:list={[
+                      'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition',
+                      isCurrent(item.href)
+                        ? 'bg-primary font-medium text-white'
+                        : 'text-slate-600 hover:bg-primary/10 hover:text-primary dark:text-slate-300',
+                    ]}
+                  >
+                    {item.label}
+                    {Boolean(item.badge) && (
+                      <span
+                        class:list={[
+                          'rounded-full px-1.5 py-0.5 text-xs font-semibold',
+                          isCurrent(item.href) ? 'bg-white text-primary' : 'bg-primary text-white',
+                        ]}
+                      >
+                        {item.badge}
+                        <span class="sr-only"> unread</span>
+                      </span>
+                    )}
+                  </a>
+                ))}
+            </nav>
+
+            <div class="ms-auto flex items-center gap-3 text-sm">
+              <a href="/" class="text-slate-500 transition hover:text-primary">
+                View site
+              </a>
+              {user && (
+                <>
+                  <span class="hidden text-slate-400 sm:inline" title={roleLabel(user.role)}>
+                    {displayName(user)}
+                  </span>
+                  <form method="POST" action="/api/admin/logout">
+                    <button
+                      type="submit"
+                      class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:border-primary hover:text-primary dark:border-slate-700"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        </header>
+      )
+    }
+
+    <main class="mx-auto max-w-5xl px-4 py-8">
+      <slot />
+    </main>
+  </body>
+</html>

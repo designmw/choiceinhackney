@@ -1,0 +1,176 @@
+---
+/**
+ * Renders an ordered list of contract blocks (see ~/contract/v1) through the
+ * base's existing widget library. This is the only place that maps a block
+ * type to a component, so adding a block means one schema entry plus one
+ * case here.
+ */
+import type { Block } from '~/contract/v1';
+
+import Hero from '~/components/widgets/Hero.astro';
+import Features from '~/components/widgets/Features.astro';
+import Steps from '~/components/widgets/Steps.astro';
+import Content from '~/components/widgets/Content.astro';
+import Testimonials from '~/components/widgets/Testimonials.astro';
+import FAQs from '~/components/widgets/FAQs.astro';
+import Stats from '~/components/widgets/Stats.astro';
+import Pricing from '~/components/widgets/Pricing.astro';
+import CallToAction from '~/components/widgets/CallToAction.astro';
+import Brands from '~/components/widgets/Brands.astro';
+import Contact from '~/components/widgets/Contact.astro';
+
+export interface Props {
+  blocks: Block[];
+}
+
+const { blocks = [] } = Astro.props;
+
+const defaultContactInputs = [
+  { type: 'text', name: 'name', label: 'Name' },
+  { type: 'email', name: 'email', label: 'Email' },
+];
+---
+
+{
+  blocks.map((block) => {
+    switch (block.type) {
+      case 'hero':
+        return (
+          <Hero
+            id={block.id}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            content={block.content}
+            actions={block.actions}
+            image={block.image}
+            gallery={block.gallery}
+          />
+        );
+      case 'features':
+        return (
+          <Features
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            columns={block.columns}
+            items={block.items}
+          />
+        );
+      case 'steps':
+        return (
+          <Steps
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            items={block.items}
+            image={block.image}
+            isReversed={block.isReversed}
+          />
+        );
+      case 'content':
+        return (
+          <Content
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            content={block.content}
+            image={block.image}
+            items={block.items}
+            isReversed={block.isReversed}
+            callToAction={block.callToAction}
+          />
+        );
+      case 'testimonials':
+        return (
+          <Testimonials
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            testimonials={block.items}
+            callToAction={block.callToAction}
+          />
+        );
+      case 'faqs':
+        return (
+          <FAQs
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            columns={block.columns}
+            items={block.items}
+          />
+        );
+      case 'stats':
+        return (
+          <Stats
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            stats={block.items}
+          />
+        );
+      case 'pricing':
+        return (
+          <Pricing
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            prices={block.prices}
+          />
+        );
+      case 'cta':
+        return (
+          <CallToAction
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            actions={block.actions}
+          />
+        );
+      case 'brands':
+        return (
+          <Brands
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            images={block.images}
+          />
+        );
+      case 'contact':
+        return (
+          <Contact
+            id={block.id}
+            isDark={block.isDark}
+            tagline={block.tagline}
+            title={block.title}
+            subtitle={block.subtitle}
+            description={block.description}
+            inputs={block.inputs ?? defaultContactInputs}
+            textarea={block.textarea ?? { label: 'Message' }}
+            button={block.button}
+          />
+        );
+      default:
+        return null;
+    }
+  })
+}

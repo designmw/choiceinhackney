@@ -1,0 +1,36 @@
+---
+import { Icon } from 'astro-icon/components';
+import { business } from '~/config/business';
+
+// Mobile-only sticky Call + WhatsApp bar — the highest-converting element for
+// local/trades sites. Sourced from business.ts; hidden on lg+ (desktop has the
+// header + footer contact). Remove <StickyContact /> from Layout.astro to
+// disable it for a client that doesn't want it.
+const tel = business.telephone;
+const telHref = `tel:${tel.replace(/\s/g, '')}`;
+const waHref = `https://wa.me/${tel.replace(/\D/g, '')}`;
+---
+
+{
+  tel && (
+    <div class="lg:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-gray-200 dark:border-slate-700">
+      <a
+        href={telHref}
+        class="flex flex-1 items-center justify-center gap-2 py-3.5 font-semibold text-white bg-primary hover:bg-secondary transition"
+      >
+        <Icon name="tabler:phone" class="w-5 h-5" aria-hidden="true" />
+        Call
+      </a>
+      <a
+        href={waHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex flex-1 items-center justify-center gap-2 py-3.5 font-semibold text-white bg-[#25D366] hover:brightness-95 transition"
+      >
+        {/* #25D366 is WhatsApp's official brand green — intentionally not a theme token */}
+        <Icon name="tabler:brand-whatsapp" class="w-5 h-5" aria-hidden="true" />
+        WhatsApp
+      </a>
+    </div>
+  )
+}

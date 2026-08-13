@@ -1,0 +1,16 @@
+# Client intake for `npm run setup --from client.example.yaml`.
+# Copy to client.yaml, fill in, then run. Any omitted key uses the default.
+name: Brennan Plumbing & Heating
+legalName: Brennan Plumbing & Heating Ltd
+type: Plumber # schema.org LocalBusiness subtype
+url: https://brennanplumbing.ie
+telephone: '+353 66 123 4567'
+email: info@brennanplumbing.ie
+street: 14 Rock Street
+locality: Tralee
+region: Co. Kerry
+postalCode: V92 XY12
+description: Boiler servicing, installation, and emergency call-outs across Co. Kerry.
+brand: '#1d4ed8' # hex brand colour
+gaId: '' # GA4 Measurement ID, or blank
+workerName: brennan-plumbing # Cloudflare Worker name

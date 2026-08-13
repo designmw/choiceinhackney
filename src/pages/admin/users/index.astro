@@ -1,0 +1,177 @@
+---
+export const prerender = false;
+
+// Account management — one of the two gaps Boston's decision brief listed as
+// unbuilt ("today a new committee member requires a SQL insert"). Adding a
+// colleague should not require a developer.
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { requireUser, isAdmin, roleLabel } from '~/lib/cms/auth';
+import { getDb } from '~/lib/cms/env';
+import { log } from '~/lib/cms/activity';
+import { cms } from '~/config/cms';
+
+const user = await requireUser(Astro.cookies);
+if (!user) return Astro.redirect(`/admin/login?next=${encodeURIComponent(Astro.url.pathname)}`);
+// Editors are sent to the overview rather than shown a "forbidden" page: they
+// don't need to know an account screen exists.
+if (!isAdmin(user)) return Astro.redirect('/admin');
+
+let notice: string | null = null;
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const id = Number(form.get('id'));
+  const db = await getDb();
+
+  if (!db || !Number.isInteger(id)) {
+    error = 'That account could not be found.';
+  } else if (id === user.id) {
+    // Not a permissions question — it's the "locked out of your own site"
+    // question. There is no password-reset flow, so an admin who removes their
+    // own account needs a developer with wrangler to get back in.
+    error = 'You can’t remove your own account while you’re signed in to it.';
+  } else {
+    const target = await db.prepare('SELECT email FROM cms_users WHERE id = ?').bind(id).first<{ email: string }>();
+
+    const remaining = await db
+      .prepare("SELECT COUNT(*) AS n FROM cms_users WHERE role = 'admin' AND id != ?")
+      .bind(id)
+      .first<{ n: number }>();
+
+    if (!target) {
+      error = 'That account could not be found.';
+    } else if ((remaining?.n ?? 0) === 0) {
+      error = 'There has to be at least one full administrator.';
+    } else {
+      await db.prepare('DELETE FROM cms_users WHERE id = ?').bind(id).run();
+      await log(user, 'removed', `Removed the account for ${target.email}`);
+      notice = `${target.email} can no longer sign in.`;
+    }
+  }
+}
+
+const db = await getDb();
+const { results: people = [] } = (await db
+  ?.prepare('SELECT id, email, first_name, last_name, role, created_at FROM cms_users ORDER BY created_at')
+  .all<{
+    id: number;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role: 'admin' | 'viewer';
+    created_at: string;
+  }>()) ?? { results: [] };
+---
+
+<AdminLayout title="People" user={user}>
+  <div class="flex flex-wrap items-center gap-4">
+    <div>
+      <h1 class="font-heading text-2xl font-semibold tracking-tight">Logins for this dashboard</h1>
+      <p class="mt-2 text-slate-600 dark:text-slate-400">
+        Accounts that can sign in here, at <code>/admin</code>. Nothing else.
+      </p>
+    </div>
+    <a
+      href="/admin/users/edit"
+      class="ms-auto rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-secondary"
+    >
+      Add a login
+    </a>
+  </div>
+
+  {
+    (notice || error) && (
+      <p
+        role={error ? 'alert' : 'status'}
+        class:list={[
+          'mt-6 rounded-md border px-4 py-3 text-sm',
+          error
+            ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200'
+            : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
+        ]}
+      >
+        {error ?? notice}
+      </p>
+    )
+  }
+
+  <ul
+    class="mt-8 divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900"
+  >
+    {
+      people.map((person) => (
+        <li class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+          <div class="min-w-0">
+            <div class="font-medium">
+              {`${person.first_name} ${person.last_name}`.trim() || person.email}
+              {person.id === user.id && <span class="ms-2 text-sm font-normal text-slate-400">you</span>}
+            </div>
+            <div class="truncate text-sm text-slate-500">{person.email}</div>
+          </div>
+
+          <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium dark:bg-slate-800">
+            {roleLabel(person.role)}
+          </span>
+
+          <div class="ms-auto flex items-center gap-2 text-sm">
+            <a
+              href={`/admin/users/edit?id=${person.id}`}
+              class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              Change
+            </a>
+            {person.id !== user.id && (
+              <form method="POST" data-confirm={`Remove ${person.email}? They will not be able to sign in again.`}>
+                <input type="hidden" name="id" value={person.id} />
+                <button
+                  type="submit"
+                  class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  Remove
+                </button>
+              </form>
+            )}
+          </div>
+        </li>
+      ))
+    }
+  </ul>
+
+  {
+    /* The single most likely misreading of this screen, so it says so on the
+      screen rather than in documentation nobody opens. */
+  }
+  {
+    cms.portals.enabled && (
+      <div class="mt-8 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+        <h2 class="font-heading font-semibold text-slate-900 dark:text-slate-100">This is not the portal list</h2>
+        <p class="mt-2">
+          Removing a login here stops that person using this dashboard. It does <strong>not</strong> affect who can open
+          the staff or trustee portal — that is controlled separately, in Cloudflare Zero Trust, and the two lists have
+          nothing to do with each other.
+        </p>
+        <p class="mt-2">
+          Somebody can hold one, the other, or both. A staff member who only needs to read documents usually needs no
+          login here at all.
+        </p>
+      </div>
+    )
+  }
+
+  <p class="mt-6 text-sm text-slate-500">
+    There is no “forgot password” email. If someone is locked out, open their account here and set a new password for
+    them.
+  </p>
+</AdminLayout>
+
+<script>
+  // Confirm-on-submit, bound from script rather than an inline onsubmit so the
+  // page needs no relaxed Content-Security-Policy.
+  document.querySelectorAll<HTMLFormElement>('form[data-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (!confirm(form.dataset.confirm ?? 'Are you sure?')) event.preventDefault();
+    });
+  });
+</script>

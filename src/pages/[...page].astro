@@ -1,0 +1,43 @@
+---
+/**
+ * Renders editor-managed pages from the `page` content collection
+ * (src/data/pages/*.json, contract v1). Hand-authored .astro routes take
+ * priority over this catch-all, so a JSON page only serves a path that no
+ * file route occupies. On editor-managed sites, remove the hand-authored
+ * marketing pages you want the editor to own.
+ */
+import { getCollection, type CollectionEntry } from 'astro:content';
+import Layout from '~/layouts/PageLayout.astro';
+import BlockRenderer from '~/components/blocks/BlockRenderer.astro';
+import { pagePathFromId } from '~/contract/v1';
+import type { MetaData } from '~/types';
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const pages = await getCollection('page', ({ data }) => !data.draft);
+  return pages
+    .map((entry) => ({ entry, path: pagePathFromId(entry.id, entry.data) }))
+    .filter(({ path }) => path !== '/')
+    .map(({ entry, path }) => ({ params: { page: path.replace(/^\//, '') }, props: { entry } }));
+}
+
+export interface Props {
+  entry: CollectionEntry<'page'>;
+}
+
+const { entry } = Astro.props;
+const { title, metadata: pageMeta, blocks } = entry.data;
+
+const metadata: MetaData = {
+  title: pageMeta.title ?? title,
+  description: pageMeta.description,
+  ignoreTitleTemplate: pageMeta.ignoreTitleTemplate,
+  canonical: pageMeta.canonical,
+  robots: pageMeta.robots,
+};
+---
+
+<Layout metadata={metadata}>
+  <BlockRenderer blocks={blocks} />
+</Layout>

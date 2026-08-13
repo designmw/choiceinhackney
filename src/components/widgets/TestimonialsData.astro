@@ -1,0 +1,25 @@
+---
+import { getCollection } from 'astro:content';
+import Testimonials from '~/components/widgets/Testimonials.astro';
+import type { Testimonials as Props } from '~/types';
+
+// Drop-in Testimonials that loads from the `testimonial` content collection
+// (src/data/testimonials/). Takes the same props as <Testimonials> except
+// `testimonials`, which it fills itself. For ⭐ stars in Google, set a real
+// business.aggregateRating (see business.ts) — see the note in CLAUDE.md.
+const props = Astro.props as Props;
+
+const entries = (await getCollection('testimonial', ({ data }) => !data.draft)).sort(
+  (a, b) => (a.data.order ?? 999) - (b.data.order ?? 999)
+);
+
+const testimonials = entries.map((entry) => ({
+  testimonial: entry.data.testimonial,
+  name: entry.data.name,
+  job: entry.data.job,
+  image: entry.data.image,
+  rating: entry.data.rating,
+}));
+---
+
+{testimonials.length > 0 && <Testimonials {...props} testimonials={testimonials} />}

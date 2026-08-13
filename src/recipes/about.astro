@@ -1,0 +1,46 @@
+---
+// RECIPE — copy this file to src/pages/about.astro and edit the copy.
+import Layout from '~/layouts/PageLayout.astro';
+import HeroText from '~/components/widgets/HeroText.astro';
+import Content from '~/components/widgets/Content.astro';
+import Features from '~/components/widgets/Features.astro';
+import CallToAction from '~/components/widgets/CallToAction.astro';
+import { getPermalink } from '~/utils/permalinks';
+import { business } from '~/config/business';
+
+const metadata = {
+  title: 'About',
+};
+---
+
+<Layout metadata={metadata}>
+  <HeroText tagline="About" title={`About ${business.name}`} />
+
+  <Content
+    title="Who we are"
+    subtitle="A short paragraph on the business — history, values, and what sets it apart. Keep it human and local."
+    isReversed
+    items={[
+      { title: 'Experienced', description: 'Years serving the local area.', icon: 'tabler:award' },
+      { title: 'Trusted', description: 'Fully insured and reliable.', icon: 'tabler:shield-check' },
+      { title: 'Local', description: `Based in ${business.address.locality}.`, icon: 'tabler:map-pin' },
+    ]}
+  />
+
+  <Features
+    tagline="Why choose us"
+    title="What you can expect"
+    columns={2}
+    items={[
+      { title: 'Clear pricing', description: 'No surprises — quotes up front.', icon: 'tabler:coin-euro' },
+      { title: 'On time', description: 'We turn up when we say we will.', icon: 'tabler:clock-check' },
+      { title: 'Quality work', description: 'Done properly, first time.', icon: 'tabler:tool' },
+      { title: 'Friendly service', description: 'Real people, happy to help.', icon: 'tabler:mood-smile' },
+    ]}
+  />
+
+  <CallToAction
+    title="Have a question?"
+    actions={[{ variant: 'primary', text: 'Get in touch', href: getPermalink('/contact') }]}
+  />
+</Layout>

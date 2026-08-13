@@ -1,0 +1,216 @@
+---
+export const prerender = false;
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { requireUser, isAdmin, hashPassword } from '~/lib/cms/auth';
+import { getDb } from '~/lib/cms/env';
+import { log } from '~/lib/cms/activity';
+
+const user = await requireUser(Astro.cookies);
+if (!user) return Astro.redirect(`/admin/login?next=${encodeURIComponent(Astro.url.pathname)}`);
+if (!isAdmin(user)) return Astro.redirect('/admin');
+
+const db = await getDb();
+const idParam = Astro.url.searchParams.get('id');
+const id = idParam ? Number(idParam) : null;
+
+interface Person {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: 'admin' | 'viewer';
+}
+
+let person: Person | null =
+  id && db
+    ? await db
+        .prepare('SELECT id, email, first_name, last_name, role FROM cms_users WHERE id = ?')
+        .bind(id)
+        .first<Person>()
+    : null;
+
+if (id && !person) return Astro.redirect('/admin/users');
+
+let error: string | null = null;
+
+// Shortest password worth enforcing. Length beats character-class rules, which
+// mostly produce "Password1!" and a sticky note.
+const MIN_PASSWORD = 10;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const email = String(form.get('email') ?? '')
+    .trim()
+    .toLowerCase();
+  const firstName = String(form.get('first_name') ?? '').trim();
+  const lastName = String(form.get('last_name') ?? '').trim();
+  // Anything that isn't explicitly 'admin' becomes a viewer, so a malformed
+  // or missing value can only ever grant less.
+  const role = String(form.get('role') ?? 'viewer') === 'admin' ? 'admin' : 'viewer';
+  const password = String(form.get('password') ?? '');
+
+  if (!db) {
+    error = 'The site database is not connected, so accounts can’t be changed.';
+  } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    error = 'Enter a valid email address.';
+  } else if (password && password.length < MIN_PASSWORD) {
+    error = `A password needs to be at least ${MIN_PASSWORD} characters.`;
+  } else if (!person && !password) {
+    error = 'Set a password for the new account.';
+  } else {
+    // Guard the last-admin case here too, not just on delete: demoting the only
+    // administrator locks account management away from everyone.
+    if (person && person.role === 'admin' && role !== 'admin') {
+      const others = await db
+        .prepare("SELECT COUNT(*) AS n FROM cms_users WHERE role = 'admin' AND id != ?")
+        .bind(person.id)
+        .first<{ n: number }>();
+      if ((others?.n ?? 0) === 0) error = 'There has to be at least one full administrator.';
+    }
+
+    if (!error) {
+      // Uniqueness is enforced by the UNIQUE index on cms_users.email; this
+      // check exists to produce a readable message rather than a 500.
+      const clash = await db
+        .prepare('SELECT id FROM cms_users WHERE email = ? AND id != ?')
+        .bind(email, person?.id ?? -1)
+        .first<{ id: number }>();
+
+      if (clash) {
+        error = 'Another account already uses that email address.';
+      } else if (person) {
+        await db
+          .prepare('UPDATE cms_users SET email = ?, first_name = ?, last_name = ?, role = ? WHERE id = ?')
+          .bind(email, firstName, lastName, role, person.id)
+          .run();
+
+        if (password) {
+          await db
+            .prepare('UPDATE cms_users SET password_hash = ? WHERE id = ?')
+            .bind(await hashPassword(password), person.id)
+            .run();
+          // Every existing session for that account dies with the password, so
+          // a changed password actually ends access rather than just changing
+          // what would be needed to sign in again.
+          await db.prepare('DELETE FROM cms_sessions WHERE user_id = ?').bind(person.id).run();
+        }
+
+        await log(user, 'updated', `Updated the account for ${email}${password ? ' and set a new password' : ''}`);
+        return Astro.redirect('/admin/users');
+      } else {
+        await db
+          .prepare('INSERT INTO cms_users (email, first_name, last_name, role, password_hash) VALUES (?, ?, ?, ?, ?)')
+          .bind(email, firstName, lastName, role, await hashPassword(password))
+          .run();
+
+        await log(user, 'added', `Added an account for ${email}`);
+        return Astro.redirect('/admin/users');
+      }
+    }
+  }
+
+  // Keep what was typed so a rejected form doesn't make someone start again.
+  person = { id: person?.id ?? 0, email, first_name: firstName, last_name: lastName, role };
+}
+
+const heading = id ? 'Change this person’s details' : 'Add someone';
+---
+
+<AdminLayout title={heading} user={user}>
+  <h1 class="font-heading text-2xl font-semibold tracking-tight">{heading}</h1>
+
+  {
+    error && (
+      <p
+        role="alert"
+        class="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+      >
+        {error}
+      </p>
+    )
+  }
+
+  <form method="POST" class="mt-8 max-w-lg space-y-5">
+    <div class="grid gap-5 sm:grid-cols-2">
+      <div>
+        <label for="first_name" class="block text-sm font-medium">First name</label>
+        <input
+          id="first_name"
+          name="first_name"
+          value={person?.first_name ?? ''}
+          class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        />
+      </div>
+      <div>
+        <label for="last_name" class="block text-sm font-medium">Last name</label>
+        <input
+          id="last_name"
+          name="last_name"
+          value={person?.last_name ?? ''}
+          class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        />
+      </div>
+    </div>
+
+    <div>
+      <label for="email" class="block text-sm font-medium">Email address</label>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        required
+        value={person?.email ?? ''}
+        autocomplete="off"
+        class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+      />
+      <p class="mt-1 text-sm text-slate-500">This is what they sign in with.</p>
+    </div>
+
+    <div>
+      <label for="password" class="block text-sm font-medium">
+        {id ? 'New password' : 'Password'}
+      </label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        minlength={MIN_PASSWORD}
+        required={!id}
+        autocomplete="new-password"
+        class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+      />
+      <p class="mt-1 text-sm text-slate-500">
+        {
+          id
+            ? 'Leave this blank to keep their current password. Setting a new one signs them out everywhere.'
+            : `At least ${MIN_PASSWORD} characters. Tell them in person or by phone, not by email.`
+        }
+      </p>
+    </div>
+
+    <fieldset>
+      <legend class="text-sm font-medium">What they can do</legend>
+      <label class="mt-2 flex items-start gap-2 text-sm">
+        <input type="radio" name="role" value="editor" checked={person?.role !== 'admin'} class="mt-1" />
+        <span><strong class="font-medium">Can edit text</strong> — change the wording on any page.</span>
+      </label>
+      <label class="mt-2 flex items-start gap-2 text-sm">
+        <input type="radio" name="role" value="admin" checked={person?.role === 'admin'} class="mt-1" />
+        <span
+          ><strong class="font-medium">Full administrator</strong> — the above, plus adding and removing people.</span
+        >
+      </label>
+    </fieldset>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button
+        type="submit"
+        class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-secondary"
+      >
+        Save
+      </button>
+      <a href="/admin/users" class="text-sm text-slate-500 underline underline-offset-4">Cancel</a>
+    </div>
+  </form>
+</AdminLayout>

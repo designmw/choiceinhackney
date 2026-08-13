@@ -1,0 +1,247 @@
+---
+export const prerender = false;
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { requireUser, isAdmin } from '~/lib/cms/auth';
+import { cmsAvailable } from '~/lib/cms/env';
+import { listSubmissions, submissionCounts, setStatus, deleteSubmission } from '~/lib/cms/submissions';
+import { log } from '~/lib/cms/activity';
+
+const user = await requireUser(Astro.cookies);
+if (!user) return Astro.redirect(`/admin/login?next=${encodeURIComponent(Astro.url.pathname)}`);
+// Admin only. A viewer signs in to read the document lists and nothing else,
+// so anything that changes the website redirects them away rather than showing
+// a screen full of controls that will refuse to work.
+if (!isAdmin(user)) return Astro.redirect('/admin');
+
+let notice: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const id = Number(form.get('id'));
+  const action = String(form.get('action') ?? '');
+
+  if (Number.isInteger(id) && id > 0) {
+    if (action === 'handled' || action === 'new') {
+      await setStatus(id, action);
+      notice = action === 'handled' ? 'Marked as dealt with.' : 'Moved back to new.';
+    } else if (action === 'delete') {
+      await deleteSubmission(id);
+      await log(user, 'deleted', `Deleted enquiry #${id}`);
+      notice = 'Enquiry deleted.';
+    }
+  }
+}
+
+const configured = await cmsAvailable();
+
+const statusParam = Astro.url.searchParams.get('status');
+const status = statusParam === 'new' || statusParam === 'handled' ? statusParam : 'all';
+const search = Astro.url.searchParams.get('q') ?? '';
+
+const rows = configured ? await listSubmissions({ status, search }) : [];
+const counts = configured ? await submissionCounts() : { total: 0, unread: 0, undelivered: 0 };
+
+const when = (value: string) =>
+  new Date(value.replace(' ', 'T') + 'Z').toLocaleString('en-IE', { dateStyle: 'medium', timeStyle: 'short' });
+
+const tabs = [
+  { key: 'all', label: `All (${counts.total})` },
+  { key: 'new', label: `New (${counts.unread})` },
+  { key: 'handled', label: 'Dealt with' },
+];
+
+const tabHref = (key: string) => {
+  const url = new URL(Astro.url);
+  if (key === 'all') url.searchParams.delete('status');
+  else url.searchParams.set('status', key);
+  return url.pathname + url.search;
+};
+
+const exportHref = `/api/admin/submissions.csv${Astro.url.search}`;
+---
+
+<AdminLayout title="Enquiries" user={user}>
+  <div class="flex flex-wrap items-start gap-4">
+    <div>
+      <h1 class="font-heading text-2xl font-semibold tracking-tight">Enquiries</h1>
+      <p class="mt-2 text-slate-600 dark:text-slate-400">Everything sent through the contact form on your website.</p>
+    </div>
+    {
+      rows.length > 0 && (
+        <a
+          href={exportHref}
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-center text-sm transition hover:border-primary hover:text-primary sm:ms-auto sm:w-auto dark:border-slate-700"
+        >
+          Download as spreadsheet
+        </a>
+      )
+    }
+  </div>
+
+  {
+    counts.undelivered > 0 && (
+      <p
+        role="alert"
+        class="mt-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+      >
+        <strong class="font-semibold">
+          {counts.undelivered} {counts.undelivered === 1 ? 'enquiry' : 'enquiries'} did not reach your inbox.
+        </strong>{' '}
+        They are saved here in full, so nothing is lost, but the email notification failed. They are marked{' '}
+        <em>Not emailed</em> below.
+      </p>
+    )
+  }
+
+  {
+    notice && (
+      <p
+        role="status"
+        class="mt-6 rounded-md border border-slate-300 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+      >
+        {notice}
+      </p>
+    )
+  }
+
+  {/* Filters. Stacks on a phone, sits on one line from `sm` up. */}
+  <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+    <div class="flex flex-wrap gap-1 text-sm">
+      {
+        tabs.map((tab) => (
+          <a
+            href={tabHref(tab.key)}
+            aria-current={status === tab.key ? 'page' : undefined}
+            class:list={[
+              'rounded-md px-2.5 py-1.5 transition',
+              status === tab.key
+                ? 'bg-primary font-medium text-white'
+                : 'text-slate-600 hover:bg-primary/10 hover:text-primary dark:text-slate-300',
+            ]}
+          >
+            {tab.label}
+          </a>
+        ))
+      }
+    </div>
+
+    <form method="GET" class="flex gap-2 sm:ms-auto">
+      {status !== 'all' && <input type="hidden" name="status" value={status} />}
+      <label for="q" class="sr-only">Search enquiries</label>
+      <input
+        id="q"
+        name="q"
+        value={search}
+        placeholder="Search name, email or message"
+        class="w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm sm:w-72 dark:border-slate-700 dark:bg-slate-900"
+      />
+      <button
+        type="submit"
+        class="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm transition hover:border-primary hover:text-primary dark:border-slate-700"
+      >
+        Search
+      </button>
+    </form>
+  </div>
+
+  {
+    rows.length === 0 ? (
+      <p class="mt-8 rounded-lg border border-dashed border-slate-300 px-4 py-10 text-center text-slate-500 dark:border-slate-700">
+        {search || status !== 'all'
+          ? 'No enquiries match that.'
+          : 'No enquiries yet. Anything sent through your contact form will appear here.'}
+      </p>
+    ) : (
+      /* Cards rather than a table, at every width.
+         A table of enquiries has one long free-text column and five short ones,
+         which is exactly the shape that either overflows a phone or squeezes the
+         message into a two-word-wide column. Cards read the same on a 360px
+         phone and a desktop, so there is no separate mobile layout to maintain. */
+      <ul class="mt-6 space-y-3">
+        {rows.map((row) => (
+          <li
+            class:list={[
+              'rounded-lg border bg-white p-4 dark:bg-slate-900',
+              row.status === 'new' ? 'border-primary/40 shadow-sm' : 'border-slate-200 dark:border-slate-800',
+            ]}
+          >
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span class="font-medium">{row.name}</span>
+              {row.status === 'new' && (
+                <span class="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">New</span>
+              )}
+              {!row.delivered && (
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+                  Not emailed
+                </span>
+              )}
+              <span class="w-full text-sm text-slate-400 sm:ms-auto sm:w-auto">{when(row.created_at)}</span>
+            </div>
+
+            {/* Contact details wrap onto their own lines on a phone; long email
+                addresses break rather than forcing the card to scroll. */}
+            <div class="mt-2 flex flex-col gap-x-4 gap-y-1 text-sm sm:flex-row sm:flex-wrap">
+              <a href={`mailto:${row.email}`} class="break-all text-primary underline underline-offset-4">
+                {row.email}
+              </a>
+              {row.phone && (
+                <a href={`tel:${row.phone.replace(/\s/g, '')}`} class="text-primary underline underline-offset-4">
+                  {row.phone}
+                </a>
+              )}
+              {row.page && <span class="break-all text-slate-400">from {row.page}</span>}
+            </div>
+
+            <p class="mt-3 border-s-2 border-slate-200 ps-3 whitespace-pre-wrap text-slate-800 dark:border-slate-700 dark:text-slate-200">
+              {row.message}
+            </p>
+
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <a
+                href={`mailto:${row.email}?subject=${encodeURIComponent('Re: your enquiry')}`}
+                class="rounded-md bg-primary px-2.5 py-1.5 font-medium text-white transition hover:bg-secondary"
+              >
+                Reply
+              </a>
+
+              <form method="POST">
+                <input type="hidden" name="id" value={row.id} />
+                <input type="hidden" name="action" value={row.status === 'new' ? 'handled' : 'new'} />
+                <button
+                  type="submit"
+                  class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:border-primary hover:text-primary dark:border-slate-700"
+                >
+                  {row.status === 'new' ? 'Mark as dealt with' : 'Move back to new'}
+                </button>
+              </form>
+
+              <form
+                method="POST"
+                class="ms-auto"
+                data-confirm={`Delete the enquiry from ${row.name}? This cannot be undone.`}
+              >
+                <input type="hidden" name="id" value={row.id} />
+                <input type="hidden" name="action" value="delete" />
+                <button
+                  type="submit"
+                  class="rounded-md border border-slate-300 px-2.5 py-1.5 text-slate-500 transition hover:border-red-400 hover:text-red-700 dark:border-slate-700"
+                >
+                  Delete
+                </button>
+              </form>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</AdminLayout>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>('form[data-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (!confirm(form.dataset.confirm ?? 'Are you sure?')) event.preventDefault();
+    });
+  });
+</script>

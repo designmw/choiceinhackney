@@ -1,0 +1,140 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+import HeroText from '~/components/widgets/HeroText.astro';
+import ContactUs from '~/components/widgets/Contact.astro';
+import LocalBusinessSchema from '~/components/schema/LocalBusinessSchema.astro';
+
+const metadata = {
+  title: 'Contact',
+};
+---
+
+<Layout metadata={metadata}>
+  <Fragment slot="head">
+    <LocalBusinessSchema />
+  </Fragment>
+
+  <HeroText tagline="Contact" title="Get in touch" />
+
+  <ContactUs
+    id="form"
+    title="Drop us a message"
+    description="Tell us what you're looking for and we'll get back to you as soon as we can."
+    inputs={[
+      {
+        type: 'text',
+        name: 'name',
+        label: 'Name',
+      },
+      {
+        type: 'email',
+        name: 'email',
+        label: 'Email',
+      },
+      {
+        type: 'tel',
+        name: 'phone',
+        label: 'Phone',
+        autocomplete: 'tel',
+      },
+    ]}
+    textarea={{
+      label: 'Message',
+    }}
+    disclaimer={{
+      label: 'By submitting this form you agree to our privacy policy.',
+    }}
+  />
+</Layout>
+
+<script>
+  // Cloudflare Turnstile global (present only when the widget script has loaded).
+  interface TurnstileApi {
+    render: (el: HTMLElement, opts: Record<string, unknown>) => string;
+  }
+  const win = window as unknown as { turnstile?: TurnstileApi };
+
+  // Explicitly render the Turnstile widget (if configured). Runs on every
+  // astro:page-load so it re-renders after a View Transition into this page.
+  function renderTurnstile(): void {
+    const el = document.getElementById('cf-turnstile');
+    if (!el) return; // Turnstile not enabled
+    if (el.dataset.rendered) return; // already rendered on this DOM node
+    if (!win.turnstile) {
+      window.setTimeout(renderTurnstile, 200); // api.js not ready yet — retry
+      return;
+    }
+    win.turnstile.render(el, { sitekey: el.dataset.sitekey, theme: 'auto' });
+    el.dataset.rendered = '1';
+  }
+
+  function showError(form: HTMLFormElement, message: string) {
+    const existing = form.querySelector('.form-error');
+    existing?.remove();
+    const el = document.createElement('p');
+    el.className = 'form-error mt-4 text-sm text-center text-red-600 dark:text-red-400';
+    el.textContent = message;
+    form.appendChild(el);
+  }
+
+  function initContactForm(): void {
+    const form = document.getElementById('contact-form') as HTMLFormElement | null;
+    if (!form || form.dataset.bound) return; // guard against double-binding
+    form.dataset.bound = '1';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const honeypot = form.querySelector<HTMLInputElement>('input[name="website"]');
+      if (honeypot?.value) return;
+
+      const submitBtn = form.querySelector<HTMLButtonElement>('[type="submit"]');
+      const originalText = submitBtn?.textContent ?? '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending…';
+      }
+
+      const formData = new FormData(form);
+      const data: Record<string, string> = {};
+      formData.forEach((v, k) => {
+        data[k] = String(v);
+      });
+
+      try {
+        // No trailing slash. config.yaml ships trailingSlash: false, so
+        // '/api/contact/' 404s before the endpoint is ever reached and the form
+        // fails silently. Keep these two in step if trailingSlash ever changes.
+        const res = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const json = await res.json();
+
+        if (res.ok && json.success) {
+          form.innerHTML =
+            '<p class="py-8 text-center text-lg font-medium text-green-600 dark:text-green-400">Thank you — we\'ll be in touch soon.</p>';
+        } else {
+          showError(form, json.error ?? 'Something went wrong. Please try again.');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        }
+      } catch {
+        showError(form, 'Something went wrong. Please try again.');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      }
+    });
+  }
+
+  // Fires on first load and after every View Transition navigation.
+  document.addEventListener('astro:page-load', () => {
+    initContactForm();
+    renderTurnstile();
+  });
+</script>

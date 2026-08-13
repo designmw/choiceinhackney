@@ -1,0 +1,52 @@
+---
+import { getCollection } from 'astro:content';
+import { SITE, ANALYTICS } from 'astrowind:config';
+import { business } from '~/config/business';
+
+// Dev-only reminder of what still holds template placeholder values. Rendered
+// only under `astro dev` (import.meta.env.DEV) so it is completely absent from
+// production builds. Uses a native <details> element — no script, so it is
+// safe across View Transitions. Mirrors `npm run check:golive`.
+const isDev = import.meta.env.DEV;
+
+const gaId = ANALYTICS?.vendors?.googleAnalytics?.id ?? null;
+const issues: string[] = [];
+
+if (isDev) {
+  if (String(SITE?.site ?? '').includes('example.com')) issues.push('Site URL is still example.com (config.yaml)');
+  if (SITE?.name === 'dmw-astro-base') issues.push('Site name is the template default (config.yaml)');
+  if (business.name === 'Business Name') issues.push('Business name is a placeholder (business.ts)');
+  if (business.telephone.includes('XX')) issues.push('Business phone is a placeholder (business.ts)');
+  if ((business.email ?? '').includes('example.com')) issues.push('Business email is a placeholder (business.ts)');
+  if (business.type === 'LocalBusiness') issues.push('Business schema type is the generic fallback (business.ts)');
+  if (gaId === 'G-TEST12345') issues.push('Google Analytics id is the demo placeholder (config.yaml)');
+  const services = await getCollection('service');
+  if (services.some((s) => s.id.startsWith('example-service')))
+    issues.push('Example service files still in src/data/services/');
+  const testimonials = await getCollection('testimonial');
+  if (testimonials.some((t) => t.id.startsWith('example')))
+    issues.push('Example testimonials still in src/data/testimonials/');
+  const faqs = await getCollection('faq');
+  if (faqs.some((f) => f.id.startsWith('example'))) issues.push('Example FAQs still in src/data/faq/');
+  const editorPages = await getCollection('page');
+  if (editorPages.some((p) => p.id.startsWith('example'))) issues.push('Example editor pages still in src/data/pages/');
+}
+---
+
+{
+  isDev && issues.length > 0 && (
+    <details class="fixed bottom-3 left-3 z-60 max-w-xs rounded-lg border border-amber-300 bg-amber-50 text-amber-900 shadow-lg dark:border-amber-500/40 dark:bg-amber-950 dark:text-amber-100">
+      <summary class="cursor-pointer select-none list-none px-3 py-2 text-sm font-medium">
+        ⚠ {issues.length} setup item{issues.length > 1 ? 's' : ''} left
+      </summary>
+      <ul class="border-t border-amber-200 px-4 py-2 text-xs leading-relaxed dark:border-amber-500/30">
+        {issues.map((i) => (
+          <li class="list-disc ml-3 my-1">{i}</li>
+        ))}
+      </ul>
+      <p class="px-4 pb-2 text-[11px] opacity-70">
+        Dev only · run `npm run setup` · verify with `npm run check:golive`
+      </p>
+    </details>
+  )
+}

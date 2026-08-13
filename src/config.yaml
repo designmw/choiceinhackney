@@ -1,0 +1,90 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# This file holds site/SEO settings. The client's IDENTITY (name, contact,
+# address, schema type) lives in src/config/business.ts — the single source of
+# truth that feeds schema, the footer, and the contact form.
+#
+# Easiest way to fill both in: run `npm run setup` (one questionnaire writes
+# this file, business.ts, the brand colour, and the Worker name). Before launch
+# run `npm run check:golive` to catch any leftover placeholders.
+# ─────────────────────────────────────────────────────────────────────────────
+site:
+  name: dmw-astro-base
+  site: 'https://example.com'
+  base: '/'
+  trailingSlash: false
+  # Google Search Console verification. Paste ONLY the token from the
+  # "HTML tag" method (the content="..." value), not the whole meta tag.
+  # Renders <meta name="google-site-verification"> in <head>. Leave '' if
+  # verifying by DNS or by submitting the sitemap instead.
+  googleSiteVerificationId: ''
+
+# Default SEO metadata
+metadata:
+  title:
+    default: dmw-astro-base
+    template: '%s — Site Name'
+  description: 'A lean Astro v6 + Tailwind CSS v4 base starter for local Irish SME websites.'
+  robots:
+    index: false # CHANGE TO true BEFORE GO-LIVE
+    follow: false # CHANGE TO true BEFORE GO-LIVE
+  openGraph:
+    site_name: dmw-astro-base
+    images:
+      - url: '~/assets/images/default.png'
+        width: 1200
+        height: 628
+    type: website
+  twitter:
+    cardType: summary_large_image
+
+i18n:
+  language: en-IE
+  textDirection: ltr
+
+apps:
+  blog:
+    isEnabled: true
+    postsPerPage: 6
+
+    post:
+      isEnabled: true
+      permalink: '/%slug%' # Variables: %slug%, %year%, %month%, %day%, %hour%, %minute%, %second%, %category%
+      robots:
+        index: false # CHANGE TO true BEFORE GO-LIVE
+
+    list:
+      isEnabled: true
+      pathname: 'blog'
+      robots:
+        index: false # CHANGE TO true BEFORE GO-LIVE
+
+    category:
+      isEnabled: true
+      pathname: 'category'
+      robots:
+        index: false # CHANGE TO true BEFORE GO-LIVE
+
+    tag:
+      isEnabled: true
+      pathname: 'tag'
+      robots:
+        index: false
+
+    isRelatedPostsEnabled: true
+    relatedPostsCount: 4
+
+analytics:
+  vendors:
+    googleAnalytics:
+      id: null # set to the GA4 Measurement ID, e.g. "G-XXXXXXXXXX", to enable
+      # Google Analytics loads under Consent Mode v2: analytics/ads storage is
+      # DENIED until the visitor accepts via the cookie banner. Setting an `id`
+      # above is what makes the cookie banner appear.
+      partytown: false
+
+ui:
+  # Client sites are light-only by default: no theme toggle in the nav, and the
+  # visitor's OS dark-mode preference is ignored. To offer dark mode on a build,
+  # set this to 'system' and add `showToggleTheme` back to the Header in
+  # src/layouts/PageLayout.astro.
+  theme: 'light:only' # Values: "system" | "light" | "dark" | "light:only" | "dark:only"

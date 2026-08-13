@@ -1,0 +1,417 @@
+---
+// The live page editor overlay.
+//
+// Injected into a public page only when a signed-in editor visits with ?edit=1.
+// Everyone else gets nothing — no script, no styles, no markup. That's the key
+// property: the editor cannot slow down or break the public site, because on a
+// public request it does not exist.
+//
+// Editing is contentEditable on the tagged region itself, so the text is edited
+// in place, in the real design, at the real width. That is the whole argument
+// for this over a CMS form: the client sees the heading in the heading's font,
+// in the layout it lives in, instead of guessing from a text box in another tab.
+
+import { MAX_REGION_LENGTH } from '~/lib/cms/editable';
+
+// Styles are an inline string rather than an Astro <style> block on purpose.
+//
+// Astro collects a component's <style> into the page bundle when the component
+// is *imported*, not when it renders — so a plain <style is:global> here ships
+// to every public visitor of the page even though the editor never rendered for
+// them. On Boston that was not merely dead weight: a `body { padding-bottom }`
+// rule put 4rem of empty space at the bottom of the public page.
+//
+// `is:inline` opts out of that pipeline entirely: the tag is emitted as literal
+// markup, so it exists only on requests where this component actually renders.
+//
+// Amber, deliberately not the brand colour. The first version outlined regions
+// in the site's primary colour, which is invisible on a page header painted in
+// that same colour — the very place every page's editable title lives. An edit
+// affordance the editor cannot see is not an affordance. Being visibly "not the
+// design" is correct here: this chrome exists only while editing.
+//
+// (Also worth knowing: the theme's --aw-color-primary is a complete `rgb(…)`,
+// so it cannot be wrapped as rgb(var(--token) / 0.35) to add alpha — that
+// produces invalid CSS which the browser drops silently, taking the outline
+// with it.)
+const EDIT_COLOUR = '#f59e0b';
+
+const EDITOR_CSS = `
+  [data-editable] {
+    outline: 2px dashed ${EDIT_COLOUR}b3;
+    outline-offset: 3px;
+    border-radius: 2px;
+    cursor: text;
+    transition: outline-color .15s, background-color .15s;
+  }
+  [data-editable]:hover { outline-color: ${EDIT_COLOUR}; }
+  [data-editable]:focus,
+  [data-editable]:focus-visible { outline-style: solid; outline-color: ${EDIT_COLOUR}; }
+  /* Unsaved: solid ring plus a wash, so changed regions are findable at a
+     glance when several have been edited down a long page. */
+  [data-editable][data-dirty='true'] {
+    outline-style: solid;
+    outline-color: ${EDIT_COLOUR};
+    background-color: ${EDIT_COLOUR}26;
+  }
+
+  /* The bar is fixed at the bottom; stop it covering the end of the page.
+     !important because this template already sets a bottom padding on <body>
+     for the mobile sticky-contact bar. */
+  body { padding-bottom: 5rem !important; }
+
+  /* The bar stays dark rather than taking the brand colour as its background.
+     Brand colours across client sites run from near-black navy to bright
+     yellow, and white text on the bright end is unreadable — a control bar that
+     is illegible on some sites is worse than one that is neutral on all of
+     them. The brand instead appears as the top edge, which needs no contrast
+     guarantee, and matches the brand rule across the top of /admin. */
+  #cms-editor-bar {
+    position: fixed; inset-inline: 0; bottom: 0; z-index: 9999;
+    display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+    padding: .625rem 1rem;
+    background: #0f172a; color: #fff;
+    border-top: 3px solid var(--aw-color-primary, ${EDIT_COLOUR});
+    font: 500 .875rem/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #cms-editor-bar .cms-status { color: rgb(255 255 255 / .55); font-weight: 400; }
+  #cms-editor-bar .cms-actions { margin-inline-start: auto; display: flex; align-items: center; gap: .5rem; }
+  #cms-editor-bar button,
+  #cms-editor-bar a {
+    border-radius: .375rem; padding: .375rem .75rem; font-size: .875rem;
+    font-weight: 500; cursor: pointer; text-decoration: none; transition: opacity .15s, background-color .15s;
+  }
+  #cms-editor-bar button { background: #fff; color: #0f172a; border: 0; }
+  #cms-editor-bar button:disabled { opacity: .4; cursor: default; }
+  #cms-editor-bar a { border: 1px solid rgb(255 255 255 / .25); color: rgb(255 255 255 / .8); }
+  #cms-editor-bar a:hover { background: rgb(255 255 255 / .1); }
+
+  /* Images get the same amber affordance, plus a hover label — an outlined
+     image otherwise looks like a rendering fault rather than a control. */
+  [data-editable-image] {
+    outline: 2px dashed ${EDIT_COLOUR}b3;
+    outline-offset: 3px;
+    cursor: pointer;
+  }
+  [data-editable-image]:hover { outline-style: solid; outline-color: ${EDIT_COLOUR}; }
+  [data-editable-image][data-dirty='true'] { outline-style: solid; outline-color: ${EDIT_COLOUR}; }
+
+  #cms-image-picker {
+    position: fixed; inset: 0; z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgb(0 0 0 / .6); padding: 1rem;
+  }
+  #cms-image-picker[hidden] { display: none; }
+  #cms-image-picker .cms-panel {
+    background: #fff; color: #0f172a; border-radius: .75rem;
+    width: min(52rem, 100%); max-height: 85vh; display: flex; flex-direction: column;
+    font: 400 .875rem/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #cms-image-picker header {
+    display: flex; align-items: center; gap: .75rem;
+    padding: 1rem; border-bottom: 1px solid #e2e8f0;
+  }
+  #cms-image-picker h2 { font-size: 1rem; font-weight: 600; margin: 0; }
+  #cms-image-picker .cms-grid {
+    display: grid; gap: .75rem; padding: 1rem; overflow-y: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (min-width: 40rem) { #cms-image-picker .cms-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  #cms-image-picker .cms-item {
+    border: 2px solid transparent; border-radius: .5rem; overflow: hidden;
+    background: #f1f5f9; cursor: pointer; padding: 0; display: block; width: 100%;
+  }
+  #cms-image-picker .cms-item:hover { border-color: ${EDIT_COLOUR}; }
+  #cms-image-picker .cms-item img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+  #cms-image-picker .cms-item span {
+    display: block; padding: .375rem .5rem; font-size: .75rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #cms-image-picker footer {
+    padding: 1rem; border-top: 1px solid #e2e8f0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+  }
+  #cms-image-picker button.cms-close {
+    margin-inline-start: auto; border: 1px solid #cbd5e1; background: #fff;
+    border-radius: .375rem; padding: .375rem .75rem; cursor: pointer;
+  }
+`;
+---
+
+<style is:inline set:html={EDITOR_CSS}></style>
+
+<div id="cms-editor-bar">
+  <span>Editing this page</span>
+  <span class="cms-status" data-editor-status>Click any highlighted text or picture to change it</span>
+
+  <div class="cms-actions">
+    <button type="button" data-editor-save disabled>Save changes</button>
+    <a href={Astro.url.pathname} data-editor-done>Done</a>
+  </div>
+</div>
+
+{/* Image picker. Markup is inert until an editable image is clicked. */}
+<div id="cms-image-picker" hidden role="dialog" aria-modal="true" aria-labelledby="cms-picker-title">
+  <div class="cms-panel">
+    <header>
+      <h2 id="cms-picker-title">Choose a picture</h2>
+      <button type="button" class="cms-close" data-picker-close>Cancel</button>
+    </header>
+
+    <div class="cms-grid" data-picker-grid>
+      <p data-picker-empty style="grid-column: 1 / -1; color: #64748b;">Loading your pictures…</p>
+    </div>
+
+    <footer>
+      <label for="cms-picker-upload" style="font-weight: 500;">Or upload a new one:</label>
+      <input id="cms-picker-upload" type="file" accept="image/*" />
+      <span data-picker-status style="color: #64748b;"></span>
+    </footer>
+  </div>
+</div>
+
+<script is:inline define:vars={{ MAX_REGION_LENGTH }}>
+  (function () {
+    // Guard against double-binding. The template ships with <ClientRouter />, so
+    // this script's document can be swapped in by a view transition as well as
+    // loaded normally, and astro:page-load fires in both cases.
+    if (window.__cmsEditorReady) return;
+    window.__cmsEditorReady = true;
+
+    function init() {
+      const bar = document.getElementById('cms-editor-bar');
+      if (!bar) return;
+
+      // On a normal load both DOMContentLoaded and astro:page-load fire, so
+      // without this the save button and the beforeunload warning get bound
+      // twice — which sends every save request two times.
+      if (bar.dataset.cmsBound) return;
+      bar.dataset.cmsBound = '1';
+
+      const saveButton = bar.querySelector('[data-editor-save]');
+      const status = bar.querySelector('[data-editor-status]');
+      const dirty = new Map();
+
+      const setStatus = (text) => {
+        if (status) status.textContent = text;
+      };
+
+      const refresh = () => {
+        if (saveButton) saveButton.disabled = dirty.size === 0;
+        setStatus(dirty.size ? dirty.size + ' unsaved change' + (dirty.size === 1 ? '' : 's') : 'No unsaved changes');
+      };
+
+      document.querySelectorAll('[data-editable]').forEach((el) => {
+        if (el.dataset.cmsBound) return;
+        el.dataset.cmsBound = '1';
+
+        // Snapshot the original text so "changed" means changed from what was
+        // rendered, not merely "was focused at some point".
+        el.dataset.original = el.textContent.trim();
+        el.setAttribute('contenteditable', 'plaintext-only');
+        el.setAttribute('spellcheck', 'true');
+
+        el.addEventListener('input', () => {
+          const value = el.textContent.trim();
+          if (value.length > MAX_REGION_LENGTH) {
+            el.textContent = value.slice(0, MAX_REGION_LENGTH);
+            setStatus('That is as long as one piece of text can be.');
+            return;
+          }
+          if (value === el.dataset.original) dirty.delete(el.dataset.editable);
+          else dirty.set(el.dataset.editable, value);
+
+          el.dataset.dirty = String(dirty.has(el.dataset.editable));
+          refresh();
+        });
+
+        el.addEventListener('keydown', (e) => {
+          // Enter would insert a newline into what is usually a heading. Blur
+          // instead — it reads as "I'm done with this one".
+          if (e.key === 'Enter' && el.tagName !== 'P') {
+            e.preventDefault();
+            el.blur();
+          }
+          if (e.key === 'Escape') {
+            el.textContent = el.dataset.original;
+            dirty.delete(el.dataset.editable);
+            el.dataset.dirty = 'false';
+            el.blur();
+            refresh();
+          }
+        });
+      });
+
+      // ── Images ──────────────────────────────────────────────────────────
+      //
+      // Same override mechanism as text: the region key identifies the image on
+      // the page, and the saved value is the URL of the replacement. The
+      // original file is never touched, so reverting restores it.
+      const picker = document.getElementById('cms-image-picker');
+      const grid = picker?.querySelector('[data-picker-grid]');
+      const pickerStatus = picker?.querySelector('[data-picker-status]');
+      const uploadInput = picker?.querySelector('#cms-picker-upload');
+      let targetImage = null;
+      let libraryLoaded = false;
+
+      const closePicker = () => {
+        if (picker) picker.hidden = true;
+        targetImage?.focus?.();
+        targetImage = null;
+      };
+
+      const applyImage = (url) => {
+        if (!targetImage) return;
+        targetImage.src = url;
+        // Astro emits srcset/sizes, which take precedence over src — leave them
+        // and the old picture keeps showing after a successful save.
+        targetImage.removeAttribute('srcset');
+        targetImage.removeAttribute('sizes');
+        dirty.set(targetImage.dataset.editableImage, url);
+        targetImage.dataset.dirty = 'true';
+        refresh();
+        closePicker();
+      };
+
+      async function loadLibrary() {
+        if (libraryLoaded || !grid) return;
+        try {
+          const res = await fetch('/api/admin/media-list');
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+
+          grid.innerHTML = '';
+          if (!data.items || data.items.length === 0) {
+            grid.innerHTML = '<p style="grid-column: 1 / -1; color: #64748b;">No pictures yet. Upload one below.</p>';
+          } else {
+            data.items.forEach((item) => {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'cms-item';
+              button.innerHTML = '<img loading="lazy" alt=""><span></span>';
+              button.querySelector('img').src = item.url;
+              button.querySelector('span').textContent = item.filename;
+              button.addEventListener('click', () => applyImage(item.url));
+              grid.appendChild(button);
+            });
+          }
+          libraryLoaded = true;
+        } catch (err) {
+          console.error('[cms] could not load the picture library:', err);
+          grid.innerHTML = '<p style="grid-column: 1 / -1; color: #b91c1c;">Could not load your pictures.</p>';
+        }
+      }
+
+      document.querySelectorAll('[data-editable-image]').forEach((img) => {
+        if (img.dataset.cmsBound) return;
+        img.dataset.cmsBound = '1';
+        img.dataset.original = img.getAttribute('src') || '';
+
+        // Keyboard reachable: an editor who tabs through the page must be able
+        // to change a picture without a mouse.
+        img.setAttribute('tabindex', '0');
+        img.setAttribute('role', 'button');
+        img.setAttribute('aria-label', 'Change this picture');
+
+        const open = () => {
+          targetImage = img;
+          if (picker) picker.hidden = false;
+          loadLibrary();
+        };
+
+        img.addEventListener('click', (e) => {
+          e.preventDefault();
+          open();
+        });
+        img.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            open();
+          }
+        });
+      });
+
+      picker?.querySelector('[data-picker-close]')?.addEventListener('click', closePicker);
+      picker?.addEventListener('click', (e) => {
+        if (e.target === picker) closePicker();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && picker && !picker.hidden) closePicker();
+      });
+
+      uploadInput?.addEventListener('change', async () => {
+        const file = uploadInput.files?.[0];
+        if (!file) return;
+
+        if (pickerStatus) pickerStatus.textContent = 'Uploading…';
+        const body = new FormData();
+        body.append('file', file);
+
+        try {
+          const res = await fetch('/api/admin/upload', { method: 'POST', body });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+          if (pickerStatus) pickerStatus.textContent = '';
+          uploadInput.value = '';
+          libraryLoaded = false;
+          applyImage(data.url);
+        } catch (err) {
+          console.error('[cms] upload failed:', err);
+          if (pickerStatus) pickerStatus.textContent = err.message || 'Upload failed';
+        }
+      });
+
+      saveButton?.addEventListener('click', async () => {
+        saveButton.disabled = true;
+        setStatus('Saving…');
+
+        try {
+          const res = await fetch('/api/admin/page-content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              changes: Object.fromEntries(dirty),
+              // Sent so /admin can link straight back to the page an edit was
+              // made on — the region key alone can't reconstruct a nested path.
+              path: location.pathname,
+            }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+
+          // Re-baseline rather than reloading: a reload would lose the editor's
+          // scroll position, which is maddening down a long page.
+          dirty.forEach((value, key) => {
+            const escaped = CSS.escape(key);
+            const el =
+              document.querySelector('[data-editable="' + escaped + '"]') ||
+              document.querySelector('[data-editable-image="' + escaped + '"]');
+            if (el) {
+              el.dataset.original = value;
+              el.dataset.dirty = 'false';
+            }
+          });
+          dirty.clear();
+          if (saveButton) saveButton.disabled = true;
+          setStatus('Saved — live on the site now');
+        } catch (err) {
+          console.error('[cms] save failed:', err);
+          setStatus('Could not save. Your changes are still here — try again.');
+          saveButton.disabled = false;
+        }
+      });
+
+      // Leaving with unsaved edits is almost always a mistake.
+      window.addEventListener('beforeunload', (e) => {
+        if (dirty.size > 0) e.preventDefault();
+      });
+
+      refresh();
+    }
+
+    // Run now for a normal load, and again after any view transition.
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+    document.addEventListener('astro:page-load', init);
+  })();
+</script>

@@ -1,0 +1,158 @@
+---
+export const prerender = false;
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { requireUser, displayName, isAdmin } from '~/lib/cms/auth';
+import { cmsAvailable } from '~/lib/cms/env';
+import { overrideStats } from '~/lib/cms/page-content';
+import { recentActivity } from '~/lib/cms/activity';
+import { submissionCounts } from '~/lib/cms/submissions';
+import { sitePages } from '~/lib/cms/site-pages';
+import { cms } from '~/config/cms';
+import ActivityFeed from '~/components/cms/ActivityFeed.astro';
+
+const user = await requireUser(Astro.cookies);
+if (!user) return Astro.redirect(`/admin/login?next=${encodeURIComponent(Astro.url.pathname)}`);
+
+const canEditSite = isAdmin(user);
+
+const configured = await cmsAvailable();
+const stats = configured ? await overrideStats() : { regions: 0, pages: 0, lastEdit: null };
+const activity = configured && canEditSite ? await recentActivity(8) : [];
+const enquiries = configured && canEditSite ? await submissionCounts() : { total: 0, unread: 0, undelivered: 0 };
+const pages = sitePages();
+
+const when = (value: string | null) =>
+  value
+    ? new Date(value.replace(' ', 'T') + 'Z').toLocaleString('en-IE', { dateStyle: 'medium', timeStyle: 'short' })
+    : '—';
+---
+
+<AdminLayout title="Overview" user={user}>
+  <h1 class="font-heading text-2xl font-semibold tracking-tight">Hello {displayName(user).split(' ')[0]}</h1>
+  <p class="mt-2 text-slate-600 dark:text-slate-400">
+    {
+      canEditSite
+        ? 'Pick a page below and you can change its wording directly on the page itself. Changes go live as soon as you save.'
+        : 'Your account can view and download the documents kept on this website.'
+    }
+  </p>
+
+  {
+    !canEditSite && cms.portals.enabled && (
+      <ul class="mt-8 space-y-3">
+        {cms.portals.areas.map((area) => (
+          <li class="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <span class="font-medium">{area.label}</span>
+            <a
+              href={`/admin/portals/${area.slug}`}
+              class="ms-auto rounded-md bg-primary px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-secondary"
+            >
+              See documents
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  {
+    !configured && (
+      <p
+        role="alert"
+        class="mt-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+      >
+        <strong class="font-semibold">The editor database isn’t connected.</strong> You can sign in, but nothing can be
+        saved yet. Add the D1 binding to <code>wrangler.jsonc</code> and run <code>npm run cms:init</code> — see
+        <code>docs/live-editor.md</code>.
+      </p>
+    )
+  }
+
+  {
+    /* Two across on a phone, four on a desktop. Unanswered enquiries lead,
+      because that is the one number that means somebody needs to do something. */
+  }
+  {
+    canEditSite && (
+      <div class="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <a
+          href="/admin/messages?status=new"
+          class:list={[
+            'rounded-lg border p-4 transition hover:border-primary',
+            enquiries.unread > 0
+              ? 'border-primary/40 bg-primary/5'
+              : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900',
+          ]}
+        >
+          <div class:list={['text-2xl font-semibold', enquiries.unread > 0 && 'text-primary']}>{enquiries.unread}</div>
+          <div class="mt-1 text-sm text-slate-500">
+            {enquiries.unread === 1 ? 'enquiry to answer' : 'enquiries to answer'}
+          </div>
+        </a>
+
+        <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="text-2xl font-semibold">{stats.regions}</div>
+          <div class="mt-1 text-sm text-slate-500">pieces of text changed</div>
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="text-2xl font-semibold">{stats.pages}</div>
+          <div class="mt-1 text-sm text-slate-500">pages with changes</div>
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="text-sm font-semibold">{when(stats.lastEdit)}</div>
+          <div class="mt-1 text-sm text-slate-500">last change</div>
+        </div>
+      </div>
+    )
+  }
+
+  {
+    canEditSite && (
+      <section class="mt-10">
+        <h2 class="font-heading text-lg font-semibold tracking-tight">Edit a page</h2>
+        <p class="mt-1 text-sm text-slate-500">
+          These are the pages linked from your menus. Any other page works too — just add <code>?edit=1</code> to its
+          address.
+        </p>
+
+        <ul class="mt-4 divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+          {pages.map((page) => (
+            <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+              <div class="min-w-0">
+                <div class="font-medium">{page.label}</div>
+                <div class="truncate text-sm text-slate-500">{page.path}</div>
+              </div>
+              <div class="flex items-center gap-2 text-sm sm:ms-auto">
+                <a
+                  href={page.path}
+                  class="rounded-md border border-slate-300 px-2.5 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  View
+                </a>
+                <a
+                  href={`${page.path}?edit=1`}
+                  class="rounded-md bg-primary px-2.5 py-1.5 font-medium text-white transition hover:bg-secondary"
+                >
+                  Edit text
+                </a>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  {
+    activity.length > 0 && (
+      <section class="mt-10">
+        <h2 class="font-heading text-lg font-semibold tracking-tight">Recent activity</h2>
+        <p class="mt-1 mb-4 text-sm text-slate-500">Every change made to the site, and who made it.</p>
+        <ActivityFeed items={activity} />
+      </section>
+    )
+  }
+</AdminLayout>

@@ -1,0 +1,141 @@
+---
+// Sign-in for the live page editor.
+//
+// prerender = false on every admin route, deliberately independent of the
+// LIVE_EDITOR switch in astro.config.ts. The admin has to run on demand even on
+// a site left as `output: 'static'`, or signing in would be a build-time
+// operation, which is nonsense.
+export const prerender = false;
+
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import { getDb } from '~/lib/cms/env';
+import {
+  verifyPassword,
+  createSession,
+  setSessionCookie,
+  requireUser,
+  throttled,
+  recordFailure,
+  clearFailures,
+} from '~/lib/cms/auth';
+import { safeInternalPath } from '~/lib/cms/editable';
+import { log } from '~/lib/cms/activity';
+
+let error: string | null = null;
+let email = '';
+
+const form = Astro.request.method === 'POST' ? await Astro.request.formData() : null;
+
+// Where a successful sign-in goes. Carried through the form as a hidden field
+// as well as the query string, so the destination survives a POST even if the
+// action URL loses its query.
+//
+// Only same-site relative paths are honoured: an unchecked `?next=` is an open
+// redirect that lends the client's own domain to a phishing link.
+const destination = safeInternalPath(form?.get('next') ?? Astro.url.searchParams.get('next'), '/admin');
+
+// One exit at the bottom rather than an early `return` here, purely for
+// readability — this page has three ways to end up redirecting.
+let signedIn = Boolean(await requireUser(Astro.cookies));
+
+if (!signedIn && form) {
+  email = String(form.get('email') ?? '').trim();
+  const password = String(form.get('password') ?? '');
+
+  // Throttle per client IP, falling back to the submitted address. Neither is
+  // authoritative, which is why this is a speed bump and not a control — see
+  // the note in lib/cms/auth.ts.
+  const throttleKey = Astro.request.headers.get('cf-connecting-ip') ?? email.toLowerCase();
+
+  const db = await getDb();
+
+  if (!db) {
+    error = 'The site database is not configured, so there is nothing to sign in to yet.';
+  } else if (throttled(throttleKey)) {
+    error = 'Too many failed attempts. Wait ten minutes and try again.';
+  } else if (!email || !password) {
+    error = 'Enter your email address and password.';
+  } else {
+    const row = await db
+      .prepare('SELECT id, password_hash FROM cms_users WHERE email = ?')
+      .bind(email)
+      .first<{ id: number; password_hash: string }>();
+
+    // One message for "no such account" and "wrong password", so the form can't
+    // be used to find out which addresses have logins.
+    if (row && (await verifyPassword(password, row.password_hash))) {
+      clearFailures(throttleKey);
+      setSessionCookie(Astro.cookies, await createSession(db, row.id));
+
+      const user = await requireUser(Astro.cookies);
+      await log(user, 'signed in', `Signed in from ${Astro.request.headers.get('cf-connecting-ip') ?? 'localhost'}`);
+
+      signedIn = true;
+    } else {
+      recordFailure(throttleKey);
+      error = 'That email address and password do not match an account.';
+    }
+  }
+}
+
+if (signedIn) return Astro.redirect(destination);
+---
+
+<AdminLayout title="Sign in" chrome={false}>
+  <div class="mx-auto max-w-sm pt-10">
+    <h1 class="font-heading text-xl font-semibold tracking-tight">Sign in to edit the site</h1>
+    <p class="mt-2 text-sm text-slate-500">Use the details you were given. There is no public sign-up.</p>
+
+    {
+      error && (
+        <p
+          role="alert"
+          class="mt-6 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
+          {error}
+        </p>
+      )
+    }
+
+    <form method="POST" class="mt-6 space-y-4">
+      <input type="hidden" name="next" value={destination} />
+      <div>
+        <label for="email" class="block text-sm font-medium">Email address</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value={email}
+          required
+          autocomplete="username"
+          class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        />
+      </div>
+
+      <div>
+        <label for="password" class="block text-sm font-medium">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          autocomplete="current-password"
+          class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-secondary"
+      >
+        Sign in
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-sm">
+      <a href="/" class="text-slate-500 underline underline-offset-4 hover:text-slate-900 dark:hover:text-white">
+        Back to the site
+      </a>
+    </p>
+  </div>
+</AdminLayout>

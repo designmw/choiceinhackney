@@ -1,0 +1,67 @@
+---
+// RECIPE — copy this file to src/pages/index.astro and edit the copy.
+// A complete local-SME homepage composed from the widget library. It compiles
+// as-is (type-checked by `astro check`) but is NOT a route while it lives in
+// src/recipes/. Delete the sections you don't need.
+import Layout from '~/layouts/PageLayout.astro';
+import LocalBusinessSchema from '~/components/schema/LocalBusinessSchema.astro';
+import Hero from '~/components/widgets/Hero.astro';
+import Features from '~/components/widgets/Features.astro';
+import Steps from '~/components/widgets/Steps.astro';
+import TestimonialsData from '~/components/widgets/TestimonialsData.astro';
+import FaqsData from '~/components/widgets/FaqsData.astro';
+import CallToAction from '~/components/widgets/CallToAction.astro';
+import { getPermalink } from '~/utils/permalinks';
+import { business } from '~/config/business';
+
+const metadata = {
+  title: 'Home',
+  ignoreTitleTemplate: true,
+};
+---
+
+<Layout metadata={metadata}>
+  <Fragment slot="head">
+    <LocalBusinessSchema />
+  </Fragment>
+
+  <Hero
+    tagline={business.address.region}
+    title={`Reliable local service you can count on`}
+    subtitle="A one-line promise: what you do, who for, and where. Make it specific and benefit-led."
+    actions={[
+      { variant: 'primary', text: 'Get a free quote', href: getPermalink('/contact') },
+      { variant: 'secondary', text: 'Our services', href: getPermalink('/services') },
+    ]}
+  />
+
+  <Features
+    tagline="What we do"
+    title="Services built around you"
+    columns={3}
+    items={[
+      { title: 'Service one', description: 'A benefit-led sentence about this service.', icon: 'tabler:tool' },
+      { title: 'Service two', description: 'Keep each one focused and specific.', icon: 'tabler:checklist' },
+      { title: 'Service three', description: 'Add or remove items to match the client.', icon: 'tabler:sparkles' },
+    ]}
+  />
+
+  <Steps
+    title="How it works"
+    items={[
+      { title: 'Get in touch', description: 'Call or send a message.', icon: 'tabler:phone' },
+      { title: 'Free quote', description: 'We assess and quote — no obligation.', icon: 'tabler:file-invoice' },
+      { title: 'Job done', description: 'Done right, on time.', icon: 'tabler:circle-check' },
+    ]}
+  />
+
+  <TestimonialsData tagline="Testimonials" title="What our customers say" />
+
+  <FaqsData tagline="FAQs" title="Frequently asked questions" columns={2} />
+
+  <CallToAction
+    title="Ready to get started?"
+    subtitle="Tell us what you need and we'll get back to you fast."
+    actions={[{ variant: 'primary', text: 'Contact us', href: getPermalink('/contact') }]}
+  />
+</Layout>

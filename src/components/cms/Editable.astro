@@ -1,0 +1,63 @@
+---
+// Wraps a piece of page copy so it can be edited in the browser.
+//
+// Renders the stored override if one exists, otherwise the text passed in from
+// the .astro file. With no override and no signed-in editor this is just the
+// original element around the original copy — the public site is byte-for-byte
+// what it was before, and nothing about it depends on the CMS existing.
+//
+//   <Editable key="intro" as="p">We look after Cork since 1994.</Editable>
+//
+// Most copy doesn't need this: auto-editable.ts already picks up plain <h1>–<h4>
+// and <p> inside <main>. Reach for this component when you want a *stable*
+// key that survives a wording change, or when the element isn't one of those
+// tags.
+//
+// The page slug is prepended automatically from Astro.locals, so the same
+// widget used on two pages gets two independent regions without either page
+// having to know. Pass a key containing ':' to opt out and set it explicitly.
+//
+// `as` keeps the surrounding layout intact — an editable heading still renders
+// as its own <h2> with its own classes, not a div that breaks the design.
+
+import { overrideKey } from '~/lib/cms/editable';
+
+export interface Props {
+  /** Region key. Scoped to the current page unless it already contains ':'. */
+  key: string;
+  as?: string;
+  class?: string;
+  /** Overrides map. Defaults to the one middleware loaded for this request. */
+  overrides?: Record<string, string>;
+  /** Force editing on/off. Defaults to what middleware determined. */
+  editing?: boolean;
+}
+
+const { key, as: Tag = 'span', class: className } = Astro.props;
+
+// The `?? {}` fallbacks matter for admin and API routes, which middleware
+// skips, and for any page rendered outside a request.
+const overrides = Astro.props.overrides ?? Astro.locals?.overrides ?? {};
+const editing = Astro.props.editing ?? Astro.locals?.editing ?? false;
+const slug = Astro.locals?.pageSlug ?? 'page';
+
+const fullKey = overrideKey(key.includes(':') ? key : `${slug}:${key}`);
+const stored = overrides[fullKey];
+const fallback = await Astro.slots.render('default');
+---
+
+{
+  /*
+    set:text for a stored value, set:html for the slot fallback. The distinction
+    is deliberate and load-bearing: the fallback is authored markup from a
+    .astro file and is trusted, while a stored override is text somebody typed
+    into a browser and must never be interpreted as markup.
+  */
+}
+{
+  stored !== undefined ? (
+    <Tag class={className} data-editable={editing ? fullKey : undefined} set:text={stored} />
+  ) : (
+    <Tag class={className} data-editable={editing ? fullKey : undefined} set:html={fallback} />
+  )
+}

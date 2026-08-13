@@ -1,0 +1,62 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { getCollection, render } from 'astro:content';
+import { Icon } from 'astro-icon/components';
+import Layout from '~/layouts/PageLayout.astro';
+import ServiceSchema from '~/components/schema/ServiceSchema.astro';
+import Breadcrumbs from '~/components/common/Breadcrumbs.astro';
+import { getPermalink } from '~/utils/permalinks';
+
+export const prerender = true;
+
+export const getStaticPaths = (async () => {
+  const services = await getCollection('service', ({ data }) => !data.draft);
+  return services.map((service) => ({ params: { slug: service.id }, props: { service } }));
+}) satisfies GetStaticPaths;
+
+const { service } = Astro.props;
+const { Content } = await render(service);
+
+const metadata = {
+  title: service.data.metadata?.title ?? service.data.title,
+  description: service.data.metadata?.description ?? service.data.excerpt,
+};
+---
+
+<Layout metadata={metadata}>
+  <Fragment slot="head">
+    <ServiceSchema name={service.data.title} description={service.data.excerpt} />
+  </Fragment>
+
+  <section class="px-4 py-12 sm:px-6 mx-auto lg:px-8 lg:py-16 max-w-4xl">
+    <Breadcrumbs
+      items={[{ label: 'Home', href: '/' }, { label: 'Services', href: '/services' }, { label: service.data.title }]}
+    />
+
+    <h1 class="mt-6 font-bold font-heading text-4xl md:text-5xl tracking-tight">{service.data.title}</h1>
+    {service.data.excerpt && <p class="mt-4 text-xl text-muted">{service.data.excerpt}</p>}
+
+    {
+      service.data.features && service.data.features.length > 0 && (
+        <ul class="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+          {service.data.features.map((feature) => (
+            <li class="flex items-center gap-2 text-muted">
+              <Icon name="tabler:check" class="w-5 h-5 text-primary shrink-0" aria-hidden="true" />
+              {feature}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    <div
+      class="mt-8 prose prose-lg dark:prose-invert prose-headings:font-heading prose-headings:font-bold prose-a:text-primary max-w-none"
+    >
+      <Content />
+    </div>
+
+    <div class="mt-10">
+      <a href={getPermalink('/contact')} class="btn-primary">Get in touch</a>
+    </div>
+  </section>
+</Layout>
