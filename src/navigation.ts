@@ -5,12 +5,12 @@ import { business } from './config/business';
 const telHref = `tel:${business.telephone.replace(/\s/g, '')}`;
 const emailHref = business.email ? `mailto:${business.email}` : undefined;
 
-const servicesHref = getPermalink('/services');
+const servicesHref = '/#services';
 const volunteerHref = '/#volunteer';
-const aboutHref = getPermalink('/about');
-const contactHref = getPermalink('/contact');
+const aboutHref = '/#about';
+const contactHref = '/#contact';
 const jobsHref = '/#jobs';
-const donateHref = '/contact?topic=donation';
+const donateHref = '/#contact';
 
 export const headerData = {
   links: [
@@ -169,10 +169,7 @@ export const footerData = {
       ],
     },
   ],
-  secondaryLinks: [
-    { text: 'Privacy Policy', href: getPermalink('/privacy') },
-    { text: 'Disclaimer', href: getPermalink('/terms') },
-  ],
+  secondaryLinks: [{ text: 'Accessibility', href: '/#accessibility' }],
   socialLinks: [
     { ariaLabel: 'Choice in Hackney on X', icon: 'tabler:brand-x', href: 'https://twitter.com/ChoiceinHackney' },
     {

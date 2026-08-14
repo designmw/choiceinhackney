@@ -11,17 +11,13 @@ import MissionBand from '~/components/widgets/MissionBand.astro';
 import AccessibilityCommitment from '~/components/widgets/AccessibilityCommitment.astro';
 import Callout from '~/components/widgets/Callout.astro';
 import ContactBand from '~/components/widgets/ContactBand.astro';
-import { getPermalink } from '~/utils/permalinks';
 
 // Subtle tinted section background, passed to WidgetWrapper's `bg` slot to
 // alternate the vertical rhythm between white sections.
 const tintedBg = '<div class="absolute inset-0 bg-primary/[0.04] dark:bg-white/[0.03]"></div>';
 
-const servicesHref = getPermalink('/services');
-const contactHref = getPermalink('/contact');
-const aboutHref = getPermalink('/about');
-const accessibilityHref = getPermalink('/accessibility');
-const donateHref = '/contact?topic=donation';
+const contactHref = '#contact';
+const donateHref = '#contact';
 
 import teamPhoto from '~/assets/images/brand/header.jpeg';
 import advocacyImg from '~/assets/images/brand/advocacy.jpg';
@@ -104,28 +100,32 @@ const metadata = {
         title: 'Information, Guidance and Advocacy',
         description:
           'A professional advocate stands alongside you, helps you understand your options and makes sure your voice is heard by the people making decisions about your life.',
-        href: servicesHref,
+        href: contactHref,
+        linkText: 'Ask about advocacy',
         image: { src: advocacyImg, alt: 'An advocate sitting with a service user, talking through paperwork together' },
       },
       {
         title: 'Hate Crime Advocacy',
         description:
           'If you have been the victim of a disability hate crime we will support you through reporting it, dealing with the police and getting your life back on track.',
-        href: servicesHref,
+        href: contactHref,
+        linkText: 'Ask about hate crime support',
         image: { src: hateCrimeImg, alt: 'A support worker listening to someone reporting a disability hate crime' },
       },
       {
         title: 'Get a Volunteer',
         description:
           'Our volunteers help with gardening, shopping, walks and a friendly phone call, so you can stay independent and connected in your own community.',
-        href: servicesHref,
+        href: contactHref,
+        linkText: 'Ask about a volunteer',
         image: { src: volunteerImg, alt: 'A Choice in Hackney volunteer helping a service user in their garden' },
       },
       {
         title: 'Training and Employment',
         description:
           'Disabled people are too often stuck in low paid, low grade work. This project helps you build skills, find better work and get properly paid for it.',
-        href: servicesHref,
+        href: contactHref,
+        linkText: 'Ask about training',
         image: { src: trainingImg, alt: 'People taking part in a Choice in Hackney training and employment session' },
       },
     ]}
@@ -162,6 +162,7 @@ const metadata = {
   />
 
   <SplitContent
+    id="about"
     tagline="Our story"
     title="Led by the people we support"
     content="Choice in Hackney has been run by disabled people, for disabled people, for over twenty five years. Because the people who lead this organisation have lived it themselves, the support we offer starts from understanding rather than assumption. We work with disabled people from every community in the borough, whatever your impairment, background or first language."
@@ -184,7 +185,6 @@ const metadata = {
         icon: 'tabler:wheelchair',
       },
     ]}
-    actions={[{ variant: 'secondary', text: 'Read our story', href: aboutHref }]}
     image={{
       src: teamPhoto,
       alt: 'Staff and trustees of Choice in Hackney together outside the Marie Lloyd Centre',
@@ -223,6 +223,7 @@ const metadata = {
   />
 
   <AccessibilityCommitment
+    id="accessibility"
     tagline="Accessibility"
     title="Built to work the way you do"
     subtitle="This is a site for disabled people, so being usable is the whole point rather than an afterthought. If any part of it does not work for you, tell us and we will fix it."
@@ -253,7 +254,7 @@ const metadata = {
       },
     ]}
     note="We are working towards WCAG 2.2 level AA, and we treat anything that falls short as a bug to be fixed rather than a box to be ticked."
-    actions={[{ variant: 'secondary', text: 'Read our accessibility statement', href: accessibilityHref }]}
+    actions={[{ variant: 'secondary', text: 'Tell us about an accessibility issue', href: contactHref }]}
   />
 
   <Callout
