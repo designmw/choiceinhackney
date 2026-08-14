@@ -1,7 +1,16 @@
 ---
-import { SITE } from 'astrowind:config';
+import Image from '~/components/common/Image.astro';
+import { business } from '~/config/business';
+import logo from '~/assets/images/brand/logo.png';
 ---
 
-<span class="self-center text-2xl md:text-xl font-bold text-gray-900 whitespace-nowrap dark:text-white">
-  🚀 {SITE?.name}
-</span>
+<Image
+  src={logo}
+  alt={`${business.name} logo`}
+  width={200}
+  height={72}
+  loading="eager"
+  fetchpriority="high"
+  class="h-11 w-auto md:h-12"
+  layout="constrained"
+/>

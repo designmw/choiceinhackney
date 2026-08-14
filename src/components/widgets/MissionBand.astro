@@ -1,0 +1,32 @@
+---
+/**
+ * Full-bleed brand-colour band carrying the organisation's guiding line. It
+ * breaks up a run of white sections and gives the page a strong midpoint.
+ * The swoosh shapes echo the mark in the logo and are decorative only.
+ */
+export interface Props {
+  quote?: string;
+  attribution?: string;
+}
+
+const { quote, attribution } = Astro.props;
+---
+
+<section class="relative not-prose overflow-hidden bg-primary text-white">
+  {/* Decorative swoosh motif, echoing the logo mark */}
+  <div class="pointer-events-none absolute inset-0 opacity-[0.13]" aria-hidden="true">
+    <svg class="absolute -right-16 -top-24 h-[140%] w-auto" viewBox="0 0 200 200" fill="none">
+      <path d="M20 180C20 80 90 20 190 20" stroke="currentColor" stroke-width="26" stroke-linecap="round"></path>
+      <path d="M10 190C10 110 80 55 165 55" stroke="currentColor" stroke-width="16" stroke-linecap="round"></path>
+    </svg>
+  </div>
+
+  <div class="relative mx-auto max-w-4xl px-4 md:px-6 py-16 md:py-24 text-center">
+    <blockquote>
+      <p class="font-heading text-3xl md:text-4xl lg:text-5xl font-bold leading-tight tracking-tight text-balance">
+        {quote}
+      </p>
+      {attribution && <footer class="mt-6 text-base md:text-lg text-white/80">{attribution}</footer>}
+    </blockquote>
+  </div>
+</section>

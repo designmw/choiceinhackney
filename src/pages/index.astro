@@ -1,28 +1,40 @@
 ---
-import { getEntry } from 'astro:content';
 import Layout from '~/layouts/PageLayout.astro';
 import LocalBusinessSchema from '~/components/schema/LocalBusinessSchema.astro';
-import BlockRenderer from '~/components/blocks/BlockRenderer.astro';
 
-// When the editor manages the homepage it writes src/data/pages/home.json
-// and this route renders it. Without that file (or while it is a draft)
-// the placeholder below renders instead. Astro's route priority means the
-// [...page].astro catch-all can never serve "/", so the homepage has to be
-// handled here.
-const home = await getEntry('page', 'home');
-const useContract = home && !home.data.draft;
+import HeroSplit from '~/components/widgets/HeroSplit.astro';
+import Pathways from '~/components/widgets/Pathways.astro';
+import ServiceCards from '~/components/widgets/ServiceCards.astro';
+import SplitContent from '~/components/widgets/SplitContent.astro';
+import HowItWorks from '~/components/widgets/HowItWorks.astro';
+import MissionBand from '~/components/widgets/MissionBand.astro';
+import AccessibilityCommitment from '~/components/widgets/AccessibilityCommitment.astro';
+import Callout from '~/components/widgets/Callout.astro';
+import ContactBand from '~/components/widgets/ContactBand.astro';
+import { getPermalink } from '~/utils/permalinks';
 
-const metadata = useContract
-  ? {
-      title: home.data.metadata.title ?? home.data.title,
-      description: home.data.metadata.description,
-      ignoreTitleTemplate: true,
-      robots: home.data.metadata.robots,
-    }
-  : {
-      title: 'Home',
-      ignoreTitleTemplate: true,
-    };
+// Subtle tinted section background, passed to WidgetWrapper's `bg` slot to
+// alternate the vertical rhythm between white sections.
+const tintedBg = '<div class="absolute inset-0 bg-primary/[0.04] dark:bg-white/[0.03]"></div>';
+
+const servicesHref = getPermalink('/services');
+const contactHref = getPermalink('/contact');
+const aboutHref = getPermalink('/about');
+const accessibilityHref = getPermalink('/accessibility');
+const donateHref = '/contact?topic=donation';
+
+import teamPhoto from '~/assets/images/brand/header.jpeg';
+import advocacyImg from '~/assets/images/brand/advocacy.jpg';
+import hateCrimeImg from '~/assets/images/brand/hate-crime.jpg';
+import volunteerImg from '~/assets/images/brand/volunteer.jpg';
+import trainingImg from '~/assets/images/brand/training.jpg';
+
+const metadata = {
+  title: 'Choice in Hackney | Run by disabled people, for disabled people',
+  description:
+    'Choice in Hackney is a Disabled People User Led Organisation offering free advocacy, hate crime support, volunteers and training to disabled people across Hackney.',
+  ignoreTitleTemplate: true,
+};
 ---
 
 <Layout metadata={metadata}>
@@ -30,14 +42,235 @@ const metadata = useContract
     <LocalBusinessSchema />
   </Fragment>
 
-  {
-    useContract ? (
-      <BlockRenderer blocks={home.data.blocks} />
-    ) : (
-      <section class="px-4 py-16 sm:px-6 mx-auto lg:px-8 lg:py-20 max-w-4xl">
-        <h1 class="font-bold font-heading text-4xl md:text-5xl">Home</h1>
-        <p class="mt-4 text-muted">Placeholder. Add your homepage content here.</p>
-      </section>
-    )
-  }
+  <HeroSplit
+    tagline="Disabled People User Led Organisation"
+    title="Run by disabled people, for disabled people"
+    subtitle="We support disabled people from every community in Hackney to get the services they need, live independently and with dignity, and make their own choices about their own lives."
+    actions={[
+      { variant: 'primary', text: 'Get support', href: contactHref },
+      { variant: 'secondary', text: 'Volunteer with us', href: '#volunteer' },
+    ]}
+    notes={[
+      { text: 'Free and confidential', icon: 'tabler:lock' },
+      { text: 'Based in Haggerston, E8', icon: 'tabler:map-pin' },
+      { text: 'Registered charity 1077287', icon: 'tabler:certificate' },
+    ]}
+    image={{
+      src: teamPhoto,
+      alt: 'The Choice in Hackney team standing together in the garden at the Marie Lloyd Centre',
+    }}
+  />
+
+  <Pathways
+    bg={tintedBg}
+    tagline="Where would you like to start"
+    title="Three ways to get involved"
+    subtitle="Whether you need support yourself, want to give your time, or want to help us keep going, there is a place for you here."
+    items={[
+      {
+        title: 'I need support',
+        description:
+          'Talk to an advocate about benefits, housing, care, health or anything else you are finding hard to sort out on your own.',
+        icon: 'tabler:lifebuoy',
+        href: contactHref,
+        linkText: 'Talk to us',
+      },
+      {
+        title: 'I want to volunteer',
+        description:
+          'Become a telephone befriender, gardener, shopper or walking friend and make a real difference to a disabled person nearby.',
+        icon: 'tabler:heart-handshake',
+        href: '#volunteer',
+        linkText: 'How to volunteer',
+      },
+      {
+        title: 'I want to donate',
+        description:
+          'Every donation goes straight into advocacy, volunteering and training for disabled people living in Hackney.',
+        icon: 'tabler:gift',
+        href: donateHref,
+        linkText: 'Make a donation',
+      },
+    ]}
+  />
+
+  <ServiceCards
+    id="services"
+    tagline="What we do"
+    title="Services we offer"
+    subtitle="Every service is free, confidential and shaped around what you actually need."
+    items={[
+      {
+        title: 'Information, Guidance and Advocacy',
+        description:
+          'A professional advocate stands alongside you, helps you understand your options and makes sure your voice is heard by the people making decisions about your life.',
+        href: servicesHref,
+        image: { src: advocacyImg, alt: 'An advocate sitting with a service user, talking through paperwork together' },
+      },
+      {
+        title: 'Hate Crime Advocacy',
+        description:
+          'If you have been the victim of a disability hate crime we will support you through reporting it, dealing with the police and getting your life back on track.',
+        href: servicesHref,
+        image: { src: hateCrimeImg, alt: 'A support worker listening to someone reporting a disability hate crime' },
+      },
+      {
+        title: 'Get a Volunteer',
+        description:
+          'Our volunteers help with gardening, shopping, walks and a friendly phone call, so you can stay independent and connected in your own community.',
+        href: servicesHref,
+        image: { src: volunteerImg, alt: 'A Choice in Hackney volunteer helping a service user in their garden' },
+      },
+      {
+        title: 'Training and Employment',
+        description:
+          'Disabled people are too often stuck in low paid, low grade work. This project helps you build skills, find better work and get properly paid for it.',
+        href: servicesHref,
+        image: { src: trainingImg, alt: 'People taking part in a Choice in Hackney training and employment session' },
+      },
+    ]}
+  />
+
+  <HowItWorks
+    tagline="Getting support"
+    title="Reaching out is the hardest part"
+    subtitle="You do not need a referral, a diagnosis on paper or the right words. Here is what happens when you contact us."
+    items={[
+      {
+        title: 'You get in touch',
+        description: 'Call, email or drop in by appointment. Tell us as much or as little as you want to.',
+        icon: 'tabler:phone',
+      },
+      {
+        title: 'We listen properly',
+        description:
+          'We talk through what you are dealing with and work out together which kind of support actually fits.',
+        icon: 'tabler:ear',
+      },
+      {
+        title: 'We stand alongside you',
+        description:
+          'An advocate or volunteer stays with you for as long as you need, at meetings, on the phone and in writing.',
+        icon: 'tabler:users-group',
+      },
+    ]}
+  />
+
+  <MissionBand
+    quote="Nothing about us without us"
+    attribution="The principle we were founded on, and the one we still work to every day."
+  />
+
+  <SplitContent
+    tagline="Our story"
+    title="Led by the people we support"
+    content="Choice in Hackney has been run by disabled people, for disabled people, for over twenty five years. Because the people who lead this organisation have lived it themselves, the support we offer starts from understanding rather than assumption. We work with disabled people from every community in the borough, whatever your impairment, background or first language."
+    items={[
+      {
+        title: 'Led by disabled people',
+        description: 'Our staff and board of trustees are disabled people from Hackney and the surrounding boroughs.',
+        icon: 'tabler:users',
+      },
+      {
+        title: 'Rooted in the borough',
+        description:
+          'Based at the Marie Lloyd Centre in Haggerston, a short walk from Haggerston and Dalston Junction stations.',
+        icon: 'tabler:building-community',
+      },
+      {
+        title: 'An accessible welcome',
+        description:
+          'Our office is wheelchair accessible. Tell us what you need in advance and we will make sure it is ready.',
+        icon: 'tabler:wheelchair',
+      },
+    ]}
+    actions={[{ variant: 'secondary', text: 'Read our story', href: aboutHref }]}
+    image={{
+      src: teamPhoto,
+      alt: 'Staff and trustees of Choice in Hackney together outside the Marie Lloyd Centre',
+    }}
+  />
+
+  <SplitContent
+    id="volunteer"
+    reverse
+    bg={tintedBg}
+    tagline="Volunteering"
+    title="Give a few hours, change someone's week"
+    content="Our volunteer project matches people like you with disabled people living nearby. Volunteers help service users feel less isolated, get out into their own green spaces, do their shopping and go for walks that lift both health and mood. You do not need any experience, just a bit of time and a willingness to listen."
+    items={[
+      {
+        title: 'Telephone Befriender',
+        description: 'A regular, friendly call for someone who might not speak to anyone else that day.',
+        icon: 'tabler:phone-call',
+      },
+      {
+        title: 'Gardening Volunteer',
+        description: 'Help someone enjoy their own garden again, whatever their mobility.',
+        icon: 'tabler:plant-2',
+      },
+      {
+        title: 'Shopper or Walking Friend',
+        description: 'Practical help with the shopping, or company on a walk around the neighbourhood.',
+        icon: 'tabler:walk',
+      },
+    ]}
+    actions={[{ variant: 'primary', text: 'Apply to volunteer', href: contactHref }]}
+    image={{
+      src: volunteerImg,
+      alt: 'A Choice in Hackney volunteer working alongside a service user',
+    }}
+  />
+
+  <AccessibilityCommitment
+    tagline="Accessibility"
+    title="Built to work the way you do"
+    subtitle="This is a site for disabled people, so being usable is the whole point rather than an afterthought. If any part of it does not work for you, tell us and we will fix it."
+    items={[
+      {
+        title: 'Plain language',
+        description:
+          'We use direct language, short sections and descriptive headings to make pages easier to understand and navigate.',
+        icon: 'tabler:book',
+      },
+      {
+        title: 'In your language',
+        description:
+          'English is not everyone’s first language in Hackney. Tell us what you are most comfortable with and we will find a way to talk that works.',
+        icon: 'tabler:language',
+      },
+      {
+        title: 'Keyboard and screen readers',
+        description:
+          'Every part of this site can be used without a mouse, with clear focus outlines and headings a screen reader can navigate.',
+        icon: 'tabler:keyboard',
+      },
+      {
+        title: 'Another format',
+        description:
+          'Large print, audio or a printed copy posted to you. Ask us for what suits you and we will send it out.',
+        icon: 'tabler:printer',
+      },
+    ]}
+    note="We are working towards WCAG 2.2 level AA, and we treat anything that falls short as a bug to be fixed rather than a box to be ticked."
+    actions={[{ variant: 'secondary', text: 'Read our accessibility statement', href: accessibilityHref }]}
+  />
+
+  <Callout
+    id="jobs"
+    icon="tabler:briefcase"
+    title="Work with us"
+    subtitle="New job opportunities at Choice in Hackney."
+    actions={[{ variant: 'primary', text: 'Ask about opportunities', href: contactHref }]}
+  />
+
+  <ContactBand
+    id="contact"
+    title="Get in touch and we will take it from there"
+    subtitle="Call us, email us or drop in by appointment. Tell us what you are dealing with and we will explain how we can help. There is no charge and nothing to sign up to."
+    actions={[
+      { variant: 'primary', text: 'Contact us', href: contactHref },
+      { variant: 'secondary', text: 'Donate', href: donateHref },
+    ]}
+  />
 </Layout>

@@ -2,13 +2,13 @@
 import { Icon } from 'astro-icon/components';
 import { business } from '~/config/business';
 
-// Mobile-only sticky Call + WhatsApp bar — the highest-converting element for
-// local/trades sites. Sourced from business.ts; hidden on lg+ (desktop has the
-// header + footer contact). Remove <StickyContact /> from Layout.astro to
-// disable it for a client that doesn't want it.
+// Mobile-only sticky Call + Email bar. Sourced from business.ts; hidden on lg+
+// (desktop has the header + footer contact). A charity's audience reaches us by
+// phone or email rather than WhatsApp, so those are the two actions here.
+// Remove <StickyContact /> from Layout.astro to disable it for a client.
 const tel = business.telephone;
 const telHref = `tel:${tel.replace(/\s/g, '')}`;
-const waHref = `https://wa.me/${tel.replace(/\D/g, '')}`;
+const emailHref = business.email ? `mailto:${business.email}` : undefined;
 ---
 
 {
@@ -19,18 +19,17 @@ const waHref = `https://wa.me/${tel.replace(/\D/g, '')}`;
         class="flex flex-1 items-center justify-center gap-2 py-3.5 font-semibold text-white bg-primary hover:bg-secondary transition"
       >
         <Icon name="tabler:phone" class="w-5 h-5" aria-hidden="true" />
-        Call
+        Call us
       </a>
-      <a
-        href={waHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="flex flex-1 items-center justify-center gap-2 py-3.5 font-semibold text-white bg-[#25D366] hover:brightness-95 transition"
-      >
-        {/* #25D366 is WhatsApp's official brand green — intentionally not a theme token */}
-        <Icon name="tabler:brand-whatsapp" class="w-5 h-5" aria-hidden="true" />
-        WhatsApp
-      </a>
+      {emailHref && (
+        <a
+          href={emailHref}
+          class="flex flex-1 items-center justify-center gap-2 py-3.5 font-semibold text-white bg-gray-900 hover:bg-gray-800 dark:bg-slate-700 dark:hover:bg-slate-600 transition"
+        >
+          <Icon name="tabler:mail" class="w-5 h-5" aria-hidden="true" />
+          Email us
+        </a>
+      )}
     </div>
   )
 }

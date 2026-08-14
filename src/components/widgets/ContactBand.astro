@@ -1,0 +1,108 @@
+---
+/**
+ * Full-width contact band. Everything comes from config/business.ts so it
+ * stays correct per client. Phone and email are real links, which matters most
+ * on mobile.
+ */
+import { Icon } from 'astro-icon/components';
+import { business } from '~/config/business';
+import Button from '~/components/ui/Button.astro';
+import type { CallToAction } from '~/types';
+
+export interface Props {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  actions?: CallToAction[];
+}
+
+const { id, title, subtitle, actions = [] } = Astro.props;
+
+const telHref = `tel:${business.telephone.replace(/\s/g, '')}`;
+const { street, locality, postalCode } = business.address;
+---
+
+<section id={id} class="relative not-prose scroll-mt-[72px] bg-dark text-white">
+  <div class="mx-auto max-w-6xl px-4 md:px-6 py-14 md:py-20">
+    <div class="grid gap-10 lg:grid-cols-2 lg:gap-16">
+      <div>
+        {
+          title && (
+            <h2 class="font-heading text-3xl md:text-4xl font-bold tracking-tight text-white leading-tight">{title}</h2>
+          )
+        }
+        {subtitle && <p class="mt-5 text-lg text-white/75 max-w-[52ch]">{subtitle}</p>}
+
+        {
+          actions.length > 0 && (
+            <div class="mt-8 flex flex-col sm:flex-row flex-wrap gap-4">
+              {actions.map((action) => (
+                <Button {...action} class="w-full sm:w-auto" />
+              ))}
+            </div>
+          )
+        }
+      </div>
+
+      <dl class="grid gap-6 sm:grid-cols-2">
+        <div class="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+          <dt class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
+            <Icon name="tabler:phone" class="h-4 w-4" aria-hidden="true" /> Phone
+          </dt>
+          <dd class="mt-2">
+            <a class="text-lg font-semibold text-white hover:underline" href={telHref}>{business.telephone}</a>
+          </dd>
+        </div>
+
+        <div class="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+          <dt class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
+            <Icon name="tabler:mail" class="h-4 w-4" aria-hidden="true" /> Email
+          </dt>
+          <dd class="mt-2">
+            {
+              /* overflow-wrap:anywhere so a long address wraps at the container
+                edge instead of forcing the card wider */
+            }
+            <a
+              class="text-base font-semibold text-white hover:underline [overflow-wrap:anywhere]"
+              href={`mailto:${business.email}`}
+            >
+              {business.email}
+            </a>
+          </dd>
+        </div>
+
+        <div class="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+          <dt class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
+            <Icon name="tabler:map-pin" class="h-4 w-4" aria-hidden="true" /> Visit us
+          </dt>
+          <dd class="mt-2 text-white/85">
+            {street}<br />{locality}
+            {postalCode}
+          </dd>
+        </div>
+
+        <div class="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+          <dt class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
+            <Icon name="tabler:clock" class="h-4 w-4" aria-hidden="true" /> Office hours
+          </dt>
+          <dd class="mt-2 text-white/85">Monday to Friday<br />9:30am to 5:00pm</dd>
+        </div>
+
+        <div class="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10 sm:col-span-2">
+          <dt class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
+            <Icon name="tabler:train" class="h-4 w-4" aria-hidden="true" /> Getting here
+          </dt>
+          <dd class="mt-2 grid gap-2 text-white/85 sm:grid-cols-2">
+            <p><span class="text-white/60">Overground:</span> Haggerston or Dalston Junction</p>
+            <p><span class="text-white/60">Buses:</span> 236, 149, 242, 243, 394</p>
+            <p class="sm:col-span-2 flex items-start gap-2">
+              <Icon name="tabler:wheelchair" class="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+              Our office is wheelchair accessible. Please let us know in advance if you have any access requirements.
+            </p>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>

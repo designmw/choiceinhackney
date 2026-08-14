@@ -8,8 +8,8 @@
 # run `npm run check:golive` to catch any leftover placeholders.
 # ─────────────────────────────────────────────────────────────────────────────
 site:
-  name: dmw-astro-base
-  site: 'https://example.com'
+  name: Choice in Hackney
+  site: 'https://choiceinhackney.org'
   base: '/'
   trailingSlash: false
   # Google Search Console verification. Paste ONLY the token from the
@@ -21,14 +21,14 @@ site:
 # Default SEO metadata
 metadata:
   title:
-    default: dmw-astro-base
-    template: '%s — Site Name'
-  description: 'A lean Astro v6 + Tailwind CSS v4 base starter for local Irish SME websites.'
+    default: Choice in Hackney
+    template: '%s | Choice in Hackney'
+  description: 'Choice in Hackney is run by disabled people, for disabled people. Free advocacy, hate crime support, volunteers and training for disabled people in Hackney.'
   robots:
     index: false # CHANGE TO true BEFORE GO-LIVE
     follow: false # CHANGE TO true BEFORE GO-LIVE
   openGraph:
-    site_name: dmw-astro-base
+    site_name: Choice in Hackney
     images:
       - url: '~/assets/images/default.png'
         width: 1200
@@ -38,12 +38,12 @@ metadata:
     cardType: summary_large_image
 
 i18n:
-  language: en-IE
+  language: en-GB
   textDirection: ltr
 
 apps:
   blog:
-    isEnabled: true
+    isEnabled: false
     postsPerPage: 6
 
     post:

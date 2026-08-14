@@ -110,10 +110,16 @@
   padding: 0 5px;
 }
 
-.dropdown:focus .dropdown-menu,
-.dropdown:focus-within .dropdown-menu,
-.dropdown:hover .dropdown-menu {
+.dropdown.is-open .dropdown-menu {
   display: block;
+}
+
+/* Hover remains a desktop convenience. Keyboard and touch users operate the
+   disclosure button, keeping visibility and aria-expanded in sync. */
+@media (hover: hover) and (pointer: fine) {
+  .dropdown:hover .dropdown-menu {
+    display: block;
+  }
 }
 
 /*

@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "NODE_ENV=production astro build",
     "deploy": "astro build && wrangler deploy --config dist/server/wrangler.json",
     "preview": "astro preview",
     "astro": "astro",

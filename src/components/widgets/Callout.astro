@@ -1,0 +1,56 @@
+---
+/**
+ * Slim horizontal callout band — an icon, a short message and one action.
+ *
+ * Deliberately lighter than a full section so it can sit between two larger
+ * blocks (used on the homepage for job vacancies) without competing with them.
+ */
+import { Icon } from 'astro-icon/components';
+import Button from '~/components/ui/Button.astro';
+import WidgetWrapper from '~/components/ui/WidgetWrapper.astro';
+import type { CallToAction, Widget } from '~/types';
+
+export interface Props extends Widget {
+  title?: string;
+  subtitle?: string;
+  icon?: string;
+  actions?: CallToAction[];
+}
+
+const { title, subtitle, icon, actions = [], id, isDark = false, classes = {}, bg } = Astro.props;
+---
+
+<WidgetWrapper
+  id={id}
+  isDark={isDark}
+  containerClass={`max-w-6xl py-8 md:py-10 lg:py-12 ${classes?.container ?? ''}`}
+  bg={bg}
+>
+  <div
+    class="flex flex-col gap-6 rounded-2xl border border-gray-200 bg-page p-6 shadow-sm md:flex-row md:items-center md:justify-between md:gap-8 md:p-8 dark:border-slate-700 dark:bg-slate-800/60"
+  >
+    <div class="flex items-start gap-5 md:items-center">
+      {
+        icon && (
+          <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+            <Icon name={icon} class="h-6 w-6" aria-hidden="true" />
+          </span>
+        )
+      }
+      <div>
+        {title && <h2 class="font-heading text-xl md:text-2xl font-bold text-heading">{title}</h2>}
+        {subtitle && <p class="mt-1.5 text-muted">{subtitle}</p>}
+      </div>
+    </div>
+
+    {
+      actions.length > 0 && (
+        <div class="flex shrink-0 flex-col sm:flex-row gap-4">
+          {actions.map((action) => (
+            <Button {...action} class="w-full sm:w-auto" />
+          ))}
+        </div>
+      )
+    }
+  </div>
+</WidgetWrapper>

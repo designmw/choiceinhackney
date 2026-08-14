@@ -18,6 +18,15 @@ interface Link {
 
 interface MenuLink extends Link {
   links?: Array<MenuLink>;
+  /**
+   * Optional wide panel instead of a plain dropdown list. Rendered as a
+   * full-container grid of icon-led links, with an optional highlighted card
+   * on the right. Falls back to a stacked list on mobile.
+   */
+  mega?: {
+    items: Array<{ text: string; href: string; icon: string; description?: string }>;
+    featured?: { title: string; description?: string; href: string; linkText: string; icon?: string };
+  };
 }
 
 export interface Props {
@@ -87,9 +96,97 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
         class="flex flex-col md:flex-row md:self-center w-full md:w-auto text-xl md:text-[0.9375rem] tracking-[0.01rem] font-medium md:justify-center"
       >
         {
-          links.map(({ text, href, links }, index) => (
-            <li class={links?.length ? 'dropdown' : ''}>
-              {links?.length ? (
+          links.map(({ text, href, links, mega }, index) => (
+            <li class={links?.length || mega ? 'dropdown' : ''}>
+              {mega ? (
+                <>
+                  <button
+                    type="button"
+                    class="hover:text-link dark:hover:text-white px-4 py-3 flex items-center whitespace-nowrap"
+                    aria-expanded="false"
+                    aria-controls={`dropdown-menu-${index}`}
+                    data-aw-dropdown-toggle
+                  >
+                    {text}{' '}
+                    <Icon
+                      name="tabler:chevron-down"
+                      class="w-3.5 h-3.5 ml-0.5 rtl:ml-0 rtl:mr-0.5 hidden md:inline"
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {/*
+                    The panel is positioned against the header container, not the
+                    <li>, so its top edge sits below the header's bottom padding.
+                    That left a dead strip under the trigger: the pointer crossed
+                    it on the way to the panel, :hover on .dropdown dropped, and
+                    the menu closed before it could be reached.
+
+                    Fix: pull the wrapper up past that strip with a negative
+                    margin and push the visible card back down with equal
+                    padding. The padding is transparent but still part of the
+                    <li>, so it bridges the gap and hover is never lost. The
+                    styling therefore lives on the inner card, not the wrapper.
+                  */}
+                  <div
+                    id={`dropdown-menu-${index}`}
+                    class="dropdown-menu hidden pl-4 md:pl-0 md:absolute md:left-0 md:right-0 md:top-full md:-mt-5 md:pt-5"
+                  >
+                    <div class="md:grid md:grid-cols-3 md:gap-8 md:p-7 md:rounded-2xl md:border md:border-gray-200 md:bg-white/95 md:backdrop-blur-md md:shadow-2xl md:dark:border-slate-700 md:dark:bg-slate-900/95">
+                      <ul class="md:col-span-2 md:grid md:grid-cols-2 md:gap-2 text-base">
+                        {mega.items.map((item) => (
+                          <li>
+                            <a
+                              href={item.href}
+                              class="group flex items-start gap-3 rounded-xl py-2 md:p-3 transition md:hover:bg-primary/5 md:dark:hover:bg-white/5"
+                            >
+                              <span class="mt-0.5 inline-flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-white dark:bg-accent/15 dark:text-accent">
+                                <Icon name={item.icon} class="h-5 w-5" aria-hidden="true" />
+                              </span>
+                              <span class="min-w-0">
+                                <span class="block font-semibold text-default group-hover:text-primary dark:group-hover:text-white">
+                                  {item.text}
+                                </span>
+                                {item.description && (
+                                  <span class="mt-0.5 hidden md:block text-sm font-normal leading-snug text-muted">
+                                    {item.description}
+                                  </span>
+                                )}
+                              </span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {mega.featured && (
+                        <a
+                          href={mega.featured.href}
+                          class="group hidden md:flex md:flex-col justify-end rounded-xl bg-primary p-6 text-white transition hover:bg-secondary"
+                        >
+                          {mega.featured.icon && (
+                            <Icon name={mega.featured.icon} class="h-8 w-8 opacity-90" aria-hidden="true" />
+                          )}
+                          <span class="mt-4 block font-heading text-lg font-bold leading-snug">
+                            {mega.featured.title}
+                          </span>
+                          {mega.featured.description && (
+                            <span class="mt-2 block text-sm font-normal leading-snug text-white/80">
+                              {mega.featured.description}
+                            </span>
+                          )}
+                          <span class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold">
+                            {mega.featured.linkText}
+                            <Icon
+                              name="tabler:arrow-right"
+                              class="h-4 w-4 transition-transform group-hover:translate-x-1"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : links?.length ? (
                 <>
                   {/*
                     aria-expanded is kept in sync by BasicScripts.astro, which
@@ -112,7 +209,7 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
                   </button>
                   <ul
                     id={`dropdown-menu-${index}`}
-                    class="dropdown-menu md:backdrop-blur-md dark:md:bg-dark rounded md:absolute pl-4 md:pl-0 md:hidden font-medium md:bg-white/90 md:min-w-[200px] drop-shadow-xl"
+                    class="dropdown-menu hidden md:backdrop-blur-md dark:md:bg-dark rounded md:absolute pl-4 md:pl-0 font-medium md:bg-white/90 md:min-w-[200px] drop-shadow-xl"
                   >
                     {links.map(({ text: text2, href: href2 }) => (
                       <li>

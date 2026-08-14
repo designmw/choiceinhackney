@@ -3,7 +3,10 @@
  * These values feed LocalBusinessSchema (home + contact) and can be pulled
  * into copy elsewhere via import.
  *
- * Common schema.org @type values for Irish SMEs:
+ * Common schema.org @type values:
+ *   NGO | Organization  ← charities and non-profits
+ *
+ * Common schema.org @type values for local SMEs:
  *   Plumber | Electrician | HVACBusiness | Locksmith | Roofer
  *   Attorney | AccountingService | LegalService | FinancialService
  *   HairSalon | BeautySalon | DaySpa | HealthClub
@@ -52,27 +55,36 @@ export interface BusinessConfig {
     ratingValue: number;
     reviewCount: number;
   };
+  /** Registered charity number, shown in the footer */
+  charityNumber?: string;
+  /** Companies House number, shown in the footer */
+  companyNumber?: string;
 }
 
 export const business: BusinessConfig = {
-  name: 'Business Name',
-  legalName: 'Business Legal Name Ltd',
-  type: 'LocalBusiness',
-  url: 'https://example.com',
-  telephone: '+353 XX XXX XXXX',
-  email: 'info@example.com',
+  name: 'Choice in Hackney',
+  legalName: 'Choice in Hackney',
+  type: 'NGO',
+  url: 'https://choiceinhackney.org',
+  telephone: '020 7613 3206',
+  email: 'info@choiceinhackney.org',
   address: {
-    street: '1 Main Street',
-    locality: 'Tralee',
-    region: 'Co. Kerry',
-    postalCode: 'V92 XXXX',
-    country: 'IE',
+    street: 'Marie Lloyd Centre, 329 Queensbridge Road',
+    locality: 'London',
+    region: 'Hackney',
+    postalCode: 'E8 3LA',
+    country: 'GB',
   },
-  image: 'https://example.com/images/business.jpg',
-  description: 'Short business description for schema.',
-  openingHours: ['Mo-Fr 09:00-17:00'],
-  priceRange: '€€',
-  sameAs: [],
-  // Only enable with a REAL rating that is also displayed on the site:
-  // aggregateRating: { ratingValue: 4.9, reviewCount: 37 },
+  image: 'https://choiceinhackney.org/images/choice-in-hackney.jpg',
+  description:
+    'Choice in Hackney is a Disabled People User Led Organisation. We are run by disabled people, for disabled people, supporting disabled people across Hackney to live independently and with dignity.',
+  openingHours: ['Mo-Fr 09:30-17:00'],
+  sameAs: [
+    'https://twitter.com/ChoiceinHackney',
+    'https://www.facebook.com/choiceinhackney',
+    'https://uk.linkedin.com/company/choice-in-hackney',
+  ],
+  // Charity registration — displayed in the footer.
+  charityNumber: '1077287',
+  companyNumber: '3423122',
 };

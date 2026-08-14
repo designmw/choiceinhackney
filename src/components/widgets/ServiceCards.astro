@@ -1,0 +1,70 @@
+---
+/**
+ * Image-led service cards. Each card links to a service page and carries a
+ * photograph, so the services read as real work rather than a list of icons.
+ */
+import type { ImageMetadata } from 'astro';
+import { Icon } from 'astro-icon/components';
+import Image from '~/components/common/Image.astro';
+import WidgetWrapper from '~/components/ui/WidgetWrapper.astro';
+import Headline from '~/components/ui/Headline.astro';
+import type { Widget } from '~/types';
+
+export interface Props extends Widget {
+  title?: string;
+  subtitle?: string;
+  tagline?: string;
+  items?: Array<{
+    title: string;
+    description: string;
+    href: string;
+    linkText?: string;
+    image: { src: ImageMetadata; alt: string };
+  }>;
+}
+
+const { title, subtitle, tagline, items = [], id, isDark = false, classes = {}, bg } = Astro.props;
+---
+
+<WidgetWrapper id={id} isDark={isDark} containerClass={`max-w-6xl ${classes?.container ?? ''}`} bg={bg}>
+  <Headline title={title} subtitle={subtitle} tagline={tagline} />
+
+  <ul class="grid gap-6 md:gap-8 sm:grid-cols-2">
+    {
+      items.map(({ title: itemTitle, description, href, linkText, image }) => (
+        <li class="flex intersect-once motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade">
+          <a
+            href={href}
+            class="group flex grow flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800/60"
+          >
+            <div class="overflow-hidden">
+              <Image
+                src={image.src}
+                alt={image.alt}
+                width={640}
+                height={360}
+                widths={[320, 480, 640]}
+                sizes="(max-width: 639px) 100vw, 320px"
+                format="webp"
+                layout="responsive"
+                class="w-full aspect-[16/9] object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+            </div>
+            <div class="flex grow flex-col p-6 md:p-7">
+              <h3 class="font-heading text-xl font-bold text-heading">{itemTitle}</h3>
+              <p class="mt-3 grow text-muted">{description}</p>
+              <span class="mt-5 inline-flex items-center gap-1.5 font-semibold text-primary dark:text-accent">
+                {linkText ?? `Explore ${itemTitle}`}
+                <Icon
+                  name="tabler:arrow-right"
+                  class="h-5 w-5 transition-transform group-hover:translate-x-1"
+                  aria-hidden="true"
+                />
+              </span>
+            </div>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</WidgetWrapper>

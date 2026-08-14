@@ -47,8 +47,12 @@ import { UI } from 'astrowind:config';
       let lastKnownScrollPosition = window.scrollY;
       let ticking = true;
 
-      attachEvent('#header nav', 'click', function () {
+      attachEvent('#header nav', 'click', function (event) {
+        // Disclosure buttons open submenus. Only following a link should close
+        // the entire mobile navigation.
+        if (!event.target.closest('a')) return;
         document.querySelector('[data-aw-toggle-menu]')?.classList.remove('expanded');
+        document.querySelector('[data-aw-toggle-menu]')?.setAttribute('aria-expanded', 'false');
         document.body.classList.remove('overflow-hidden');
         document.getElementById('header')?.classList.remove('h-screen');
         document.getElementById('header')?.classList.remove('expanded');
@@ -83,11 +87,8 @@ import { UI } from 'astrowind:config';
         });
       }
 
-      /*
-        Dropdowns open via CSS (:hover / :focus-within). Screen readers still
-        need the state, so mirror it onto aria-expanded, and let Escape collapse
-        an open menu without moving focus out of the header (WCAG 4.1.2).
-      */
+      /* Accessible disclosure navigation: one state controls both the visible
+         submenu and the value announced by assistive technology. */
       const syncDropdown = (dropdown, open) => {
         const toggle = dropdown.querySelector('[data-aw-dropdown-toggle]');
         if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -96,13 +97,22 @@ import { UI } from 'astrowind:config';
       document.querySelectorAll('.dropdown').forEach((dropdown) => {
         const open = () => {
           dropdown.classList.remove('is-collapsed');
+          dropdown.classList.add('is-open');
           syncDropdown(dropdown, true);
         };
         const close = () => {
-          dropdown.classList.remove('is-collapsed');
+          dropdown.classList.remove('is-open');
           syncDropdown(dropdown, false);
         };
-        dropdown.addEventListener('focusin', open);
+        const toggle = dropdown.querySelector('[data-aw-dropdown-toggle]');
+        toggle?.addEventListener('click', () => {
+          if (dropdown.classList.contains('is-open')) {
+            dropdown.classList.add('is-collapsed');
+            close();
+          } else {
+            open();
+          }
+        });
         dropdown.addEventListener('mouseenter', open);
         dropdown.addEventListener('mouseleave', () => {
           if (!dropdown.contains(document.activeElement)) close();
@@ -117,7 +127,7 @@ import { UI } from 'astrowind:config';
           if (e.key !== 'Escape') return;
           e.stopPropagation();
           dropdown.classList.add('is-collapsed');
-          syncDropdown(dropdown, false);
+          close();
           dropdown.querySelector('[data-aw-dropdown-toggle]')?.focus();
         });
       });
@@ -169,6 +179,7 @@ import { UI } from 'astrowind:config';
       const screenSize = window.matchMedia('(max-width: 767px)');
       screenSize.addEventListener('change', function () {
         document.querySelector('[data-aw-toggle-menu]')?.classList.remove('expanded');
+        document.querySelector('[data-aw-toggle-menu]')?.setAttribute('aria-expanded', 'false');
         document.body.classList.remove('overflow-hidden');
         document.getElementById('header')?.classList.remove('h-screen');
         document.getElementById('header')?.classList.remove('expanded');
@@ -205,6 +216,7 @@ import { UI } from 'astrowind:config';
       const elem = document.querySelector('[data-aw-toggle-menu]');
       if (elem) {
         elem.classList.remove('expanded');
+        elem.setAttribute('aria-expanded', 'false');
       }
       document.body.classList.remove('overflow-hidden');
       document.getElementById('header')?.classList.remove('h-screen');

@@ -1,0 +1,81 @@
+---
+/**
+ * Accessibility commitment panel.
+ *
+ * Deliberately prominent rather than tucked into the footer: for a Disabled
+ * People User Led Organisation this is a headline promise, not small print.
+ *
+ * Keep the wording to things that are actually true of the build and of the
+ * organisation. Do not claim a conformance level that has not been audited.
+ */
+import { Icon } from 'astro-icon/components';
+import Button from '~/components/ui/Button.astro';
+import WidgetWrapper from '~/components/ui/WidgetWrapper.astro';
+import type { CallToAction, Widget } from '~/types';
+
+export interface Props extends Widget {
+  title?: string;
+  tagline?: string;
+  subtitle?: string;
+  items?: Array<{ title: string; description: string; icon: string }>;
+  note?: string;
+  actions?: CallToAction[];
+}
+
+const { title, tagline, subtitle, items = [], note, actions = [], id, isDark = false, classes = {}, bg } = Astro.props;
+---
+
+<WidgetWrapper id={id} isDark={isDark} containerClass={`max-w-6xl ${classes?.container ?? ''}`} bg={bg}>
+  <div
+    class="relative overflow-hidden rounded-3xl border border-primary/20 bg-primary/[0.04] p-8 md:p-12 dark:border-white/15 dark:bg-white/[0.04]"
+  >
+    <div class="grid gap-10 lg:grid-cols-5 lg:gap-14">
+      <div class="lg:col-span-2">
+        <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-lg">
+          <Icon name="tabler:accessible" class="h-8 w-8" aria-hidden="true" />
+        </span>
+        {
+          tagline && (
+            <p class="mt-5 text-sm md:text-base font-bold uppercase tracking-wide text-primary dark:text-accent">
+              {tagline}
+            </p>
+          )
+        }
+        {
+          title && (
+            <h2 class="mt-2 font-heading text-3xl md:text-4xl font-bold tracking-tight text-heading leading-tight">
+              {title}
+            </h2>
+          )
+        }
+        {subtitle && <p class="mt-5 text-lg text-muted">{subtitle}</p>}
+
+        {
+          actions.length > 0 && (
+            <div class="mt-8 flex flex-col sm:flex-row flex-wrap gap-4">
+              {actions.map((action) => (
+                <Button {...action} class="w-full sm:w-auto" />
+              ))}
+            </div>
+          )
+        }
+      </div>
+
+      <ul class="grid gap-6 sm:grid-cols-2 lg:col-span-3">
+        {
+          items.map(({ title: itemTitle, description, icon }) => (
+            <li class="rounded-2xl bg-page p-5 shadow-sm ring-1 ring-black/5 dark:bg-slate-800/60 dark:ring-white/10 intersect-once motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade">
+              <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-accent/15 dark:text-accent">
+                <Icon name={icon} class="h-5 w-5" aria-hidden="true" />
+              </span>
+              <h3 class="mt-4 font-semibold text-lg text-heading">{itemTitle}</h3>
+              <p class="mt-2 text-muted">{description}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    {note && <p class="mt-10 border-t border-primary/15 pt-6 text-sm text-muted dark:border-white/10">{note}</p>}
+  </div>
+</WidgetWrapper>

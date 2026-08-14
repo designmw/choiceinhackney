@@ -135,11 +135,19 @@ export default defineConfig({
   ],
 
   image: {
+    // Build-time image optimization. Without this, `imageService: 'compile'`
+    // above leaves the adapter's workerd service in place, whose transform is a
+    // no-op — every `_astro/*.webp` ships as the original full-size JPEG/PNG.
+    // The entrypoint must NOT be the literal 'astro/assets/services/sharp':
+    // the adapter's `hasUserImageService()` special-cases that exact string and
+    // overrides it. Re-exporting Sharp from our own module gets past the check.
+    // See the comment block in src/lib/sharp-image-service.ts.
+    service: { entrypoint: './src/lib/sharp-image-service.ts' },
     // The endpoint route must match the site's trailing-slash behaviour or the
     // dev router 404s every local image. This template ships with
     // trailingSlash: false, so the route is registered WITHOUT the slash
     // ('/_image/' is only correct for trailingSlash 'always').
-    endpoint: { route: '/_image' },
+    endpoint: { route: '/_image', entrypoint: undefined },
     // Astro's default Sharp service handles local images.
     //
     // Most remote CDN images (Unsplash, Cloudinary, Imgix…) are routed by
